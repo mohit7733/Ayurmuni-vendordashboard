@@ -367,7 +367,7 @@ const SectionHeader = ({ icon: Icon, title, description }) => (
 
 // ==================== MAIN COMPONENT ====================
 const VendorOnboarding = () => {
-    const [currentStep, setCurrentStep] = useState(5);
+    const [currentStep, setCurrentStep] = useState(1);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showSuccess, setShowSuccess] = useState(false);
     const [uploadProgress, setUploadProgress] = useState({});
