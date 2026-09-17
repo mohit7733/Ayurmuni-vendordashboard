@@ -72,3 +72,23 @@ export async function acceptLegalPolicies(type = "all") {
     throw new Error(message);
   }
 }
+
+export async function getRequiredconfigurationsPolicies(type) {
+  try {
+    const response = await API.get(`${BASE_URL}/policies/legal/configurations/?policy_type=${type}`, {
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
+    return response.data?.data || null;
+  } catch (error) {
+    const message =
+      error?.response?.data?.message ||
+      error?.message ||
+      "Unable to load required policies right now.";
+    throw new Error(message);
+  }
+}
+
+
+
