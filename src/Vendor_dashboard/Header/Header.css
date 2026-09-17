@@ -522,7 +522,7 @@
   font-size: 13px;
   font-weight: 600;
   color: #111827;
-  max-width: 100px;
+  /* max-width: 100px; */
 }
 
 .vendor-header__dropdown {

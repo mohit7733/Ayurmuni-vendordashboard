@@ -61,7 +61,8 @@ const VALIDATION_PATTERNS = {
     gst: /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
     pan: /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/,
     fssai: /^\d{14}$/,
-    ayush: /^[A-Z0-9\/-]{6,30}$/i
+    ayush: /^[A-Z0-9\/-]{6,30}$/i,
+    website: /^(https?:\/\/)?([\w-]+(\.[\w-]+)+)(\/[\w-]*)*\/?$/i
 };
 
 const STEPS = [1, 2, 3, 4, 5];
@@ -483,6 +484,9 @@ const VendorOnboarding = () => {
 
                 if (!formData.businessInfo.ayushLicenseNumber?.trim()) newErrors.ayushLicenseNumber = "AYUSH license number is required";
                 else if (!VALIDATION_PATTERNS.ayush.test(formData.businessInfo.ayushLicenseNumber)) newErrors.ayushLicenseNumber = "Invalid AYUSH license number format";
+                
+                if (!formData.businessInfo.website?.trim() || !VALIDATION_PATTERNS.website.test(formData.businessInfo.website)) newErrors.website = "website formate is not valid";
+                
                 break;
 
             case 2:

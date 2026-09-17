@@ -46,6 +46,7 @@ export default function AddProduct() {
     maincategory: [],
     diseasescate: [],
   });
+  const [selectedServiceCategory, setSelectedServiceCategory] = useState("");
 
   // Product Information State
   const [name, setName] = useState("");
@@ -162,6 +163,45 @@ export default function AddProduct() {
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error(error?.message || "Failed to fetch data");
+    }
+  };
+
+  const getServiceCategoryName = (item) => (item?.service_category_name || "").trim();
+
+  const serviceCategories = Array.from(
+    new Map(
+      (lists.productcat || [])
+        .filter((item) => getServiceCategoryName(item))
+        .map((item) => {
+          const name = getServiceCategoryName(item);
+          return [name.toLowerCase(), name];
+        })
+    ).values()
+  );
+
+  const filteredSubcategories = selectedServiceCategory
+    ? (lists.productcat || []).filter(
+      (item) =>
+        getServiceCategoryName(item).toLowerCase() ===
+        selectedServiceCategory.toLowerCase()
+    )
+    : [];
+
+  const handleServiceCategorySelect = (category) => {
+    if (selectedServiceCategory.toLowerCase() === category.toLowerCase()) return;
+
+    setSelectedServiceCategory(category);
+    const stillValid = (lists.productcat || []).some(
+      (item) =>
+        String(item?.id) === String(formData.product_subcategory_id) &&
+        getServiceCategoryName(item).toLowerCase() === category.toLowerCase()
+    );
+
+    if (!stillValid) {
+      setFormData((prev) => ({ ...prev, product_subcategory_id: "" }));
+    }
+    if (errors.product_subcategory_id) {
+      setErrors((prev) => ({ ...prev, product_subcategory_id: "" }));
     }
   };
 
@@ -728,6 +768,10 @@ export default function AddProduct() {
       toast.error("Product name is required");
       return false;
     }
+    if (!selectedServiceCategory) {
+      toast.error("Please select Product or Medicine");
+      return false;
+    }
     if (!formData.product_subcategory_id) {
       toast.error("Category is required");
       return false;
@@ -900,22 +944,46 @@ export default function AddProduct() {
             <div className="form-section">
               {/* Product Details Form */}
               <div className="product-details-form">
-                <div className="form-group">
-                  <label>PRODUCT NAME <span className="required">*</span></label>
-                  <input
-                    type="text"
-                    placeholder="Enter product name"
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      if (errors.name) setErrors(prev => ({ ...prev, name: "" }));
-                    }}
-                    className={errors.name ? "error" : ""}
-                  />
-                  {errors.name && <span className="error-text">{errors.name}</span>}
-                  <span className="field-note">eg. Ginger Extract Powder</span>
-                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>PRODUCT NAME <span className="required">*</span></label>
+                    <input
+                      type="text"
+                      placeholder="Enter product name"
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        if (errors.name) setErrors(prev => ({ ...prev, name: "" }));
+                      }}
+                      className={errors.name ? "error" : ""}
+                    />
+                    {errors.name && <span className="error-text">{errors.name}</span>}
+                    <span className="field-note">eg. Ginger Extract Powder</span>
+                  </div>
 
+                  <div className="form-group">
+                    <label>Item Type <span className="required">*</span></label>
+                    <div className="service-category-pills">
+                      {serviceCategories.length === 0 ? (
+                        <span className="field-note">No types available</span>
+                      ) : (
+                        serviceCategories.map((category) => (
+                          <button
+                            type="button"
+                            key={category}
+                            className={`service-category-pill ${selectedServiceCategory.toLowerCase() === category.toLowerCase()
+                                ? "active"
+                                : ""
+                              }`}
+                            onClick={() => handleServiceCategorySelect(category)}
+                          >
+                            {category}
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <div className="form-row">
                   <div className="form-group">
                     <label>CATEGORY <span className="required">*</span></label>
@@ -924,10 +992,13 @@ export default function AddProduct() {
                       value={formData.product_subcategory_id}
                       onChange={handleInputChange}
                       className={errors.product_subcategory_id ? "error" : ""}
+                      disabled={!selectedServiceCategory}
                     >
-                      <option value="">Select Category</option>
-                      {lists?.productcat?.map((data) => (
-                        <option key={data?.id} value={data?.id}>{data?.name} - Service Category : {data?.service_category_name}</option>
+                      <option value="">
+                        {selectedServiceCategory ? "Select Category" : "Select type first"}
+                      </option>
+                      {filteredSubcategories.map((data) => (
+                        <option key={data?.id} value={data?.id}>{data?.name}</option>
                       ))}
                     </select>
                     {errors.product_subcategory_id && <span className="error-text">{errors.product_subcategory_id}</span>}

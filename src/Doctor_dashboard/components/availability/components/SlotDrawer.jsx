@@ -4,7 +4,7 @@ import { X, Clock, Plus, Trash2, Edit2, Coffee, Save, AlertCircle, IndianRupee }
 import { format, isPast, isToday } from 'date-fns';
 import toast from 'react-hot-toast';
 
-const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpdate, baseamount }) => {
+const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpdate, baseamount, adminamount }) => {
     const [slots, setSlots] = useState([]);
     const [originalSlots, setOriginalSlots] = useState([]);
     const [isRecurring, setIsRecurring] = useState(false);
@@ -25,7 +25,7 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
                     break_between_slots: slot.break_between_slots || 15,
                     is_active: slot.is_active !== undefined ? slot.is_active : true,
                     // amount: slot.amount > 0 ? slot.amount : (baseamount || 0),
-                    amount: "499",
+                    amount: slot.amount > 0 ? slot.amount : (adminamount?.global_fee && adminamount.global_fee > 0 ? adminamount.global_fee : "499"),
                     date: slot.date || format(selectedDate, 'yyyy-MM-dd'),
                     is_new: false,
                     is_modified: false,
@@ -43,7 +43,7 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
                     break_between_slots: editingSlot.break_between_slots || 15,
                     is_active: editingSlot.is_active !== undefined ? editingSlot.is_active : true,
                     // amount: editingSlot.amount > 0 ? editingSlot.amount : (baseamount || 0),
-                    amount: "499",
+                    amount: editingSlot.amount > 0 ? editingSlot.amount : (adminamount?.global_fee && adminamount.global_fee > 0 ? adminamount.global_fee : "499"),
                     date: editingSlot.date || format(selectedDate, 'yyyy-MM-dd'),
                     is_new: false,
                     is_modified: false
@@ -52,7 +52,7 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
                 setOriginalSlots(JSON.parse(JSON.stringify(initializedSlot)));
             }
         }
-    }, [editingSlot, isOpen, selectedDate, baseamount]);
+    }, [editingSlot, isOpen, selectedDate, baseamount, adminamount]);
 
     const addNewSlot = () => {
         const newSlot = {
@@ -64,7 +64,7 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
             break_between_slots: 15,
             is_active: true,
             // amount: baseamount || 0,
-            amount: "499",
+            amount: adminamount?.global_fee && adminamount.global_fee > 0 ? adminamount.global_fee : "499",
             is_new: true,
             is_modified: false
         };
@@ -99,15 +99,19 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
     const updateSlot = async (index, field, value) => {
         const updatedSlots = [...slots];
         const oldSlot = updatedSlots[index];
+        let endTime = oldSlot.end_time; // Preserve the original end time unless it's being updated
         // Auto-set end time to 30 minutes after start time
-        const [hours, minutes] = value?.split(":")?.map(Number);
-        const date = new Date();
-        date.setHours(hours, minutes + 30, 0, 0);
-        const endTime = date.toTimeString().slice(0, 5);
+        if (field != 'amount') {
+            const [hours, minutes] = value?.split(":")?.map(Number);
+            const date = new Date();
+            date.setHours(hours, minutes + (adminamount?.duration_minutes || 30), 0, 0);
+            endTime = date.toTimeString().slice(0, 5);
+        }
 
         updatedSlots[index] = {
             ...oldSlot,
             [field]: value,
+            amount: field === 'amount' ? Number(value) : oldSlot.amount,
             end_time: endTime,
             is_new: oldSlot.is_new || false,
             is_modified: !oldSlot.is_new
@@ -125,7 +129,7 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
                 updatedSlots[index + 1] = {
                     ...nextSlot,
                     start_time: nextStartTime,
-                    end_time: addMinutesToTime(nextStartTime, 60),
+                    end_time: addMinutesToTime(nextStartTime, adminamount?.duration_minutes || 60),
                     is_modified: !nextSlot.is_new
                 };
             }
@@ -365,6 +369,7 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
                                         onUpdate={(field, value) => updateSlot(index, field, value)}
                                         onDelete={() => removeSlot(index)}
                                         onToggleActive={() => toggleSlotActive(index)}
+                                        adminamount={adminamount}
                                     />
                                 ))}
                             </div>
@@ -479,7 +484,7 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
     );
 };
 
-const SlotEditorCard = ({ slot, index, selectedDate, isEditing, onEdit, onSave, onUpdate, onDelete, onToggleActive }) => {
+const SlotEditorCard = ({ slot, index, selectedDate, isEditing, onEdit, onSave, onUpdate, onDelete, onToggleActive, adminamount }) => {
 
     const getCurrentTime = () => {
         const now = new Date();
@@ -626,7 +631,7 @@ const SlotEditorCard = ({ slot, index, selectedDate, isEditing, onEdit, onSave, 
                                 <input
                                     type="number"
                                     value={slot.amount || ''}
-                                    disabled
+                                    disabled={adminamount?.global_fee && adminamount.global_fee > 0}
                                     onChange={(e) => onUpdate('amount', parseInt(e.target.value) || 0)}
                                     className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500"
                                     min="0"
