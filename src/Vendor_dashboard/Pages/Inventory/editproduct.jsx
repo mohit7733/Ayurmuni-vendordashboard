@@ -25,7 +25,6 @@ import Button from "../../components/shared/Button";
 import { PageLoader } from "../../components/shared/PageState";
 import {
     extractApiErrorMessage,
-    getSelectedSubcategoryMeta,
     getVariantQuantity,
     isUnicommerceSyncError,
     mapVariantFromApi,
@@ -61,6 +60,7 @@ export default function EditProduct() {
         maincategory: [],
         diseasescate: [],
     });
+    const [selectedServiceCategory, setSelectedServiceCategory] = useState("");
 
     // Product Information State
     const [name, setName] = useState("");
@@ -141,6 +141,7 @@ export default function EditProduct() {
             if (response.data.success) {
                 const product = response.data.data;
                 setName(product.name || "");
+                setSelectedServiceCategory((product.service_category_name || "").trim());
                 setFormData({
                     product_subcategory_id: product.product_subcategory_id || "",
                     brand_name_id: product.brand_name_id || "",
@@ -289,6 +290,58 @@ export default function EditProduct() {
             }));
         } catch (error) {
             toast.error(error?.message || "Failed to fetch data");
+        }
+    };
+
+    const getServiceCategoryName = (item) => (item?.service_category_name || "").trim();
+
+    const serviceCategories = Array.from(
+        new Map(
+            (lists.productcat || [])
+                .filter((item) => getServiceCategoryName(item))
+                .map((item) => {
+                    const name = getServiceCategoryName(item);
+                    return [name.toLowerCase(), name];
+                })
+        ).values()
+    );
+
+    const filteredSubcategories = selectedServiceCategory
+        ? (lists.productcat || []).filter(
+            (item) =>
+                getServiceCategoryName(item).toLowerCase() ===
+                selectedServiceCategory.toLowerCase()
+        )
+        : [];
+
+    useEffect(() => {
+        if (!formData.product_subcategory_id || !lists.productcat?.length) {
+            return;
+        }
+        const match = (lists.productcat || []).find(
+            (item) => String(item?.id) === String(formData.product_subcategory_id)
+        );
+        const name = getServiceCategoryName(match);
+        if (name && name.toLowerCase() !== selectedServiceCategory.toLowerCase()) {
+            setSelectedServiceCategory(name);
+        }
+    }, [lists.productcat, formData.product_subcategory_id, selectedServiceCategory]);
+
+    const handleServiceCategorySelect = (category) => {
+        if (selectedServiceCategory.toLowerCase() === category.toLowerCase()) return;
+
+        setSelectedServiceCategory(category);
+        const stillValid = (lists.productcat || []).some(
+            (item) =>
+                String(item?.id) === String(formData.product_subcategory_id) &&
+                getServiceCategoryName(item).toLowerCase() === category.toLowerCase()
+        );
+
+        if (!stillValid) {
+            setFormData((prev) => ({ ...prev, product_subcategory_id: "" }));
+        }
+        if (errors.product_subcategory_id) {
+            setErrors((prev) => ({ ...prev, product_subcategory_id: "" }));
         }
     };
 
@@ -769,6 +822,10 @@ export default function EditProduct() {
             toast.error("Product name is required");
             return false;
         }
+        if (!selectedServiceCategory) {
+            toast.error("Please select Product or Medicine");
+            return false;
+        }
         if (!formData.product_subcategory_id) {
             toast.error("Category is required");
             return false;
@@ -908,10 +965,6 @@ export default function EditProduct() {
     };
 
     const totalStock = variants.reduce((sum, v) => sum + getVariantQuantity(v), 0);
-    const selectedSubcategory = getSelectedSubcategoryMeta(
-        lists.productcat,
-        formData.product_subcategory_id
-    );
     const hasApprovedVariant = variants.some((v) => v.approval_status === "approved");
     const priceRange = variants.length > 0 ? {
         min: Math.min(...variants.map(v => v.selling_price)),
@@ -986,14 +1039,38 @@ export default function EditProduct() {
                     <>
                         <div className="form-section">
                             <div className="product-details-form">
-                                <div className="form-group">
-                                    <label>PRODUCT NAME <span className="required">*</span></label>
-                                    <input
-                                        type="text"
-                                        placeholder="Enter product name"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                    />
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>PRODUCT NAME <span className="required">*</span></label>
+                                        <input
+                                            type="text"
+                                            placeholder="Enter product name"
+                                            value={name}
+                                            onChange={(e) => setName(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Item Type <span className="required">*</span></label>
+                                        <div className="service-category-pills">
+                                            {serviceCategories.length === 0 ? (
+                                                <span className="field-note">No types available</span>
+                                            ) : (
+                                                serviceCategories.map((category) => (
+                                                    <button
+                                                        type="button"
+                                                        key={category}
+                                                        className={`service-category-pill ${selectedServiceCategory.toLowerCase() === category.toLowerCase()
+                                                                ? "active"
+                                                                : ""
+                                                            }`}
+                                                        onClick={() => handleServiceCategorySelect(category)}
+                                                    >
+                                                        {category}
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="form-row">
@@ -1003,17 +1080,17 @@ export default function EditProduct() {
                                             name="product_subcategory_id"
                                             value={formData.product_subcategory_id}
                                             onChange={handleInputChange}
+                                            className={errors.product_subcategory_id ? "error" : ""}
+                                            disabled={!selectedServiceCategory}
                                         >
-                                            <option value="">Select Category</option>
-                                            {lists?.productcat?.map((data) => (
+                                            <option value="">
+                                                {selectedServiceCategory ? "Select Category" : "Select type first"}
+                                            </option>
+                                            {filteredSubcategories.map((data) => (
                                                 <option key={data?.id} value={data?.id}>{data?.name}</option>
                                             ))}
                                         </select>
-                                        {selectedSubcategory && (
-                                            <p className="text-xs text-gray-500 mt-1">
-                                                HSN: {selectedSubcategory.hsn_code || "—"} · Tax: {selectedSubcategory.tax_class_code || selectedSubcategory.tax_class_name || "—"}
-                                            </p>
-                                        )}
+                                        {errors.product_subcategory_id && <span className="error-text">{errors.product_subcategory_id}</span>}
                                     </div>
                                     <div className="form-group">
                                         <label>BRAND NAME <span className="required">*</span></label>

@@ -827,6 +827,10 @@ const DietPlanManager = () => {
     };
 
     const buildPayload = () => {
+        if (galleryImages.length <= 0) {
+            toast.error('Please add at least one gallery image');
+            return false;
+        }
         const validGallery = galleryImages
             .filter((img) => img.image_url && img.image_url.trim() !== '')
             .map((img) => ({
@@ -848,12 +852,12 @@ const DietPlanManager = () => {
                             quantity: (normalized.quantity || '').trim(),
                             notes: (normalized.notes || '').trim(),
                             recipe: (normalized.recipe || []).map((url) => (url || '').trim()).filter(Boolean),
-                            // diet_gallery: (normalized.diet_gallery || [])
-                            //     .filter((img) => img.image_url)
-                            //     .map((img) => ({
-                            //         image_url: img.image_url,
-                            //         caption: img.caption || '',
-                            //     })),
+                            diet_gallery: (normalized.diet_gallery || [])
+                                .filter((img) => img.image_url)
+                                .map((img) => ({
+                                    image_url: img.image_url,
+                                    caption: img.caption || '',
+                                })),
                             preparation_steps: (normalized.preparation_steps || [])
                                 .map((step) => (step || '').trim())
                                 .filter(Boolean),
@@ -863,7 +867,7 @@ const DietPlanManager = () => {
                     .filter((item) => item.name);
                 schedule[dayKey][mealType] = {
                     diet: dietItems,
-                    diet_gallery: dietItems.flatMap((item) => item.diet_gallery || []),
+                    // diet_gallery: dietItems.flatMap((item) => item.diet_gallery || []),
                     // preparation_steps: dietItems.flatMap((item) => item.preparation_steps || []),
                     // nutrition: sumNutrition(dietItems),
                 };
@@ -900,10 +904,9 @@ const DietPlanManager = () => {
                 setLoading(false);
                 return;
             }
-            console.log('Payload:', payload);
-            // await doctorService.adddiet(payload);
-            // setMessage({ type: 'success', text: 'Diet plan created successfully!' });
-            // toast.success('Diet plan created successfully!');
+            await doctorService.adddiet(payload);
+            setMessage({ type: 'success', text: 'Diet plan created successfully!' });
+            toast.success('Diet plan created successfully!');
             resetForm();
         } catch (error) {
             console.error('Error creating diet plan:', error);
@@ -929,7 +932,6 @@ const DietPlanManager = () => {
                 setLoading(false);
                 return;
             }
-            console.log('Payload:', payload);
             const response = await doctorService.updatediet(dietPlanId, payload);
             setMessage({ type: 'success', text: 'Diet plan updated successfully!' });
             toast.success('Diet plan updated successfully!');
