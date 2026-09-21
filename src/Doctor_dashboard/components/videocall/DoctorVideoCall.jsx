@@ -63,6 +63,8 @@ const formatDuration = (seconds) =>
     .toString()
     .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 
+const VIDEO_PLAY_CONFIG = { fit: "contain" };
+
 export default function DoctorVideoCall({ consultationId: consultationIdProp, patientDetails, onCallEnd }) {
   const { consultationId: consultationIdParam } = useParams();
   const consultationId = consultationIdProp || consultationIdParam;
@@ -98,6 +100,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
   const pipPositionRef = useRef({ x: 0, y: 0 });
   const isInChannelRef = useRef(false);
   const callStateRef = useRef("idle");
+  const remoteUserRef = useRef(null);
 
   const [permissions, setPermissions] = useState({ camera: false, microphone: false });
   const [checkingPermissions, setCheckingPermissions] = useState(true);
@@ -124,6 +127,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
 
   const cleanupAgora = useCallback(async () => {
     isInChannelRef.current = false;
+    remoteUserRef.current = null;
     clearInterval(timerRef.current);
 
     const { audio, video } = localTracksRef.current;
@@ -284,11 +288,28 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
     return () => navigator.mediaDevices.removeEventListener("devicechange", getDevices);
   }, [getDevices]);
 
+  const playLocalVideo = useCallback(() => {
+    const { video } = localTracksRef.current;
+    if (!video || !localVideoRef.current) return;
+    video.play(localVideoRef.current, VIDEO_PLAY_CONFIG);
+  }, []);
+
+  const playRemoteVideo = useCallback((track) => {
+    if (!track || !remoteVideoRef.current) return;
+    track.play(remoteVideoRef.current, VIDEO_PLAY_CONFIG);
+  }, []);
+
   useEffect(() => {
-    if (callState === "active" && localTracksRef.current.video && localVideoRef.current) {
-      localTracksRef.current.video.play(localVideoRef.current);
+    if (callState === "active") {
+      playLocalVideo();
     }
-  }, [callState]);
+  }, [callState, playLocalVideo]);
+
+  useEffect(() => {
+    if (patientJoined && remoteUserRef.current?.videoTrack) {
+      playRemoteVideo(remoteUserRef.current.videoTrack);
+    }
+  }, [patientJoined, playRemoteVideo]);
 
   useEffect(() => {
     if (isRecording) {
@@ -342,18 +363,16 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
       client.on("user-published", async (user, mediaType) => {
         await client.subscribe(user, mediaType);
         if (mediaType === "video") {
+          remoteUserRef.current = user;
           setPatientJoined(true);
-          setTimeout(() => {
-            if (remoteVideoRef.current && user.videoTrack) {
-              user.videoTrack.play(remoteVideoRef.current);
-            }
-          }, 100);
+          playRemoteVideo(user.videoTrack);
         }
         if (mediaType === "audio") user.audioTrack.play();
       });
 
       client.on("user-unpublished", (user) => user.videoTrack?.stop());
       client.on("user-left", () => {
+        remoteUserRef.current = null;
         handleRemoteUserLeft();
       });
       client.on("network-quality", (stats) =>
@@ -379,6 +398,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
       // Alternative: Create tracks with more explicit constraints
       const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
         {
+          AEC: true,
           AGC: true,
           ANS: true,
         },
@@ -386,11 +406,12 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
           encoderConfig: {
             width: 640,
             height: 480,
-            frameRate: 30,
-            bitrateMin: 400,
-            bitrateMax: 800,
+            frameRate: 24,
+            bitrateMin: 200,
+            bitrateMax: 600,
           },
           facingMode: "user",
+          optimizationMode: "motion",
         }
       );
       localTracksRef.current = { audio: audioTrack, video: videoTrack };
@@ -413,6 +434,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
     loadCallStatus,
     permissions,
     handleRemoteUserLeft,
+    playRemoteVideo,
     reconcilePresence,
   ]);
 
@@ -477,10 +499,14 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
   const toggleCamera = useCallback(async () => {
     const { video } = localTracksRef.current;
     if (!video) return;
-    await video.setEnabled(isCameraOff);
-    setIsCameraOff(!isCameraOff);
-    toast(isCameraOff ? "Camera started" : "Camera stopped");
-  }, [isCameraOff]);
+    const nextCameraOff = !isCameraOff;
+    await video.setEnabled(!nextCameraOff);
+    setIsCameraOff(nextCameraOff);
+    if (!nextCameraOff) {
+      playLocalVideo();
+    }
+    toast(nextCameraOff ? "Camera stopped" : "Camera started");
+  }, [isCameraOff, playLocalVideo]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -504,9 +530,10 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
 
     if (nextDevice) {
       await video.setDevice(nextDevice.deviceId);
+      playLocalVideo();
       toast.success("Camera switched");
     }
-  }, []);
+  }, [playLocalVideo]);
 
   const onDragEnd = (event, info) => {
     pipPositionRef.current = { x: info.point.x, y: info.point.y };
@@ -594,7 +621,10 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
 
       <div className="relative h-[100vh] mx-4">
         <div className="relative w-full h-full bg-black/50 rounded-2xl overflow-hidden shadow-2xl">
-          <div ref={remoteVideoRef} className="absolute inset-0" />
+          <div
+            ref={remoteVideoRef}
+            className="video-call-player absolute inset-0 bg-black"
+          />
 
           {!patientJoined && callState === "active" && (
             <WaitingScreen patientName={patientDetails?.first_name} />
