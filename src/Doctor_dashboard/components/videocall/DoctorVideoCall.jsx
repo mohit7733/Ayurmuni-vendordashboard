@@ -63,6 +63,25 @@ const formatDuration = (seconds) =>
     .toString()
     .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 
+const getEndTimeTimestamp = (endTime) => {
+  if (!endTime) return null;
+
+  const timeOnlyMatch = String(endTime).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (timeOnlyMatch) {
+    const today = new Date();
+    today.setHours(
+      Number(timeOnlyMatch[1]),
+      Number(timeOnlyMatch[2]),
+      Number(timeOnlyMatch[3] || 0),
+      0
+    );
+    return today.getTime();
+  }
+
+  const timestamp = new Date(endTime).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+};
+
 const VIDEO_PLAY_CONFIG = { fit: "contain" };
 
 export default function DoctorVideoCall({ consultationId: consultationIdProp, patientDetails, onCallEnd }) {
@@ -77,6 +96,8 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
   const [patientJoined, setPatientJoined] = useState(false);
   const [error, setError] = useState(null);
   const [duration, setDuration] = useState(0);
+  const [timeUntilEnd, setTimeUntilEnd] = useState(null);
+  const notifiedEndWarningsRef = useRef(new Set());
   const [networkQuality, setNetworkQuality] = useState(4);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -322,6 +343,42 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
     }
     return () => clearInterval(recordingTimerRef.current);
   }, [isRecording]);
+
+  useEffect(() => {
+    const endTime = getEndTimeTimestamp(patientDetails?.end_time);
+    if (!endTime || callState !== "active") {
+      setTimeUntilEnd(null);
+      notifiedEndWarningsRef.current.clear();
+      return undefined;
+    }
+
+    const updateTimeUntilEnd = () => {
+      const remainingSeconds = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+      setTimeUntilEnd(remainingSeconds);
+
+      const warningMessages = {
+        300: "Your meeting will end in 5 minutes",
+        120: "Your meeting will end in 2 minutes",
+        30: "Your meeting will end in 30 seconds",
+      };
+
+      Object.entries(warningMessages).forEach(([threshold, message]) => {
+        const thresholdSeconds = Number(threshold);
+        if (
+          remainingSeconds <= thresholdSeconds &&
+          remainingSeconds > 0 &&
+          !notifiedEndWarningsRef.current.has(thresholdSeconds)
+        ) {
+          notifiedEndWarningsRef.current.add(thresholdSeconds);
+          toast(message);
+        }
+      });
+    };
+
+    updateTimeUntilEnd();
+    const endTimeTimer = setInterval(updateTimeUntilEnd, 1000);
+    return () => clearInterval(endTimeTimer);
+  }, [callState, patientDetails?.end_time]);
 
   const joinCall = useCallback(async () => {
     setCallState("joining");
@@ -609,6 +666,11 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
       ref={containerRef}
       className="relative min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden"
     >
+      {timeUntilEnd !== null && timeUntilEnd > 0 && timeUntilEnd <= 300 && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2  rounded-lg bg-amber-500/95 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg" style={{ zIndex: 1000 }}>
+          Meeting ends in {formatDuration(timeUntilEnd)}
+        </div>
+      )}
       <VideoHeader
         patientName={patientDetails?.first_name}
         duration={duration}

@@ -164,9 +164,11 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms-conditions" element={<TermsOfUsePage />} />
-          {/* <Route path="/login/forgot-password" element={<ForgotPassword />} />
+          {/* Password reset is OTP-login only for now — keep these pages unrouted.
+          <Route path="/login/forgot-password" element={<ForgotPassword />} />
           <Route path="/login/reset-password/:token?" element={<ResetPassword />} />
-          <Route path="/unauthorized" element={<Unauthorized />} /> */}
+          */}
+          <Route path="/unauthorized" element={<Unauthorized />} />
 
           {/* DOCTOR ROUTES */}
           {isAuthenticated && role === "doctor" && (

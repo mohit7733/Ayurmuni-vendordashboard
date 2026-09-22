@@ -1645,7 +1645,8 @@ const AppointmentDetail = ({ videodetails }) => {
         );
     }
 
-    const patient = appointment?.patient;
+
+    const patient = { ...appointment?.patient, end_time: appointment?.end_time };
     const doctor = appointment?.doctor;
     const initials = getInitials(patient?.first_name, patient?.last_name);
     const ConsultationIcon = CONSULTATION_TYPES[appointment?.consultation_type]?.icon || Video;
@@ -2107,7 +2108,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                                                         }`}
                                                                                                 >
                                                                                                     {item?.status === 'in_stock' ? 'In Stock' : 'Out of Stock'}
-                                                                                                </span>     
+                                                                                                </span>
                                                                                                 <Plus className="w-4 h-4 text-emerald-600 flex-shrink-0 opacity-0 group-hover:opacity-100" />                                                                                           <Plus className="w-4 h-4 text-emerald-600 flex-shrink-0 opacity-0 group-hover:opacity-100" />
                                                                                             </div>
                                                                                         </button>

@@ -64,9 +64,6 @@ const Header = () => {
         policies_accepted: false,
     });
 
-    console.log(allPoliciesAccepted);
-
-
     useEffect(() => {
         const userdata = JSON.parse(sessionStorage.getItem("profile") || "null");
         setUser(userdata || {});

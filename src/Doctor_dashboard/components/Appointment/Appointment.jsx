@@ -761,6 +761,9 @@ const AppointmentsPage = () => {
         toast.success('Appointments exported successfully');
     };
 
+
+
+
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
@@ -967,90 +970,109 @@ const AppointmentsPage = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {displayedAppointments.map((appointment) => (
-                                            <tr key={appointment.id} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-sm font-medium text-gray-800">{formatDate(appointment.appointment_date)}</span>
-                                                        <div className="flex items-center space-x-2 mt-1">
-                                                            <Clock size={12} className="text-gray-400" />
-                                                            <span className="text-xs text-gray-500">
-                                                                {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center space-x-3">
-                                                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0D614E] to-[#0a4d3e] flex items-center justify-center text-white font-semibold text-sm shadow-sm">
-                                                            {getInitials(appointment?.patient_name)}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium text-gray-800">{appointment.patient_name}</p>
-                                                            <p className="text-xs text-gray-400">{appointment.patient_email}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="text-sm text-gray-600">{appointment.patient_prakriti || "N/A"}</span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center space-x-1">
-                                                        {appointment.consultation_type === 'video' && <Video size={14} className="text-purple-500" />}
-                                                        {appointment.consultation_type === 'chat' && <MessageSquare size={14} className="text-blue-500" />}
-                                                        {appointment.consultation_type === 'in-person' && <Users size={14} className="text-green-500" />}
-                                                        <span className="text-sm text-gray-600 capitalize">{appointment.consultation_type || '--'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="text-sm text-gray-600" title={appointment.concern}>
-                                                        {appointment.concern?.slice(0, 40) || '--'}
-                                                        {appointment.concern?.length > 40 && '...'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <StatusBadge status={appointment.status} />
-                                                    {appointment.call_status === 'in_progress' && (new Date(appointment.appointment_date).getDate() > new Date()?.getDate()) && (
-                                                        <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full animate-pulse">
-                                                            <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                                                            Live
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center space-x-2">
-                                                        <Link
-                                                            to={`appointment/${appointment.id}`}
-                                                            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                                                            title="View Details"
-                                                        >
-                                                            <Eye size={16} className="text-gray-500" />
-                                                        </Link>
-                                                        {console.log(new Date(appointment.appointment_date).getDate(), new Date()?.getDate())}
+                                        {displayedAppointments.map((appointment) => {
+                                            const appointmentDateTime = new Date(
+                                                `${appointment.appointment_date}T${appointment.start_time}`
+                                            );
 
-                                                        {(new Date(appointment.appointment_date).getMonth() > new Date()?.getMonth() ? true : new Date(appointment.appointment_date).getDate() >= new Date()?.getDate()) ?
-                                                            appointment.status == "confirmed" && (
+                                            const now = new Date();
+
+                                            const minutesUntilAppointment =
+                                                (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60);
+
+                                            const canTakeAction = minutesUntilAppointment > 30;
+                                            return(
+                                                <tr key={appointment.id} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-medium text-gray-800">{formatDate(appointment.appointment_date)}</span>
+                                                            <div className="flex items-center space-x-2 mt-1">
+                                                                <Clock size={12} className="text-gray-400" />
+                                                                <span className="text-xs text-gray-500">
+                                                                    {formatTime(appointment.start_time)} - {formatTime(appointment.end_time)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0D614E] to-[#0a4d3e] flex items-center justify-center text-white font-semibold text-sm shadow-sm">
+                                                                {getInitials(appointment?.patient_name)}
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium text-gray-800">{appointment.patient_name}</p>
+                                                                <p className="text-xs text-gray-400">{appointment.patient_email}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-sm text-gray-600">{appointment.patient_prakriti || "N/A"}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center space-x-1">
+                                                            {appointment.consultation_type === 'video' && <Video size={14} className="text-purple-500" />}
+                                                            {appointment.consultation_type === 'chat' && <MessageSquare size={14} className="text-blue-500" />}
+                                                            {appointment.consultation_type === 'in-person' && <Users size={14} className="text-green-500" />}
+                                                            <span className="text-sm text-gray-600 capitalize">{appointment.consultation_type || '--'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-sm text-gray-600" title={appointment.concern}>
+                                                            {appointment.concern?.slice(0, 40) || '--'}
+                                                            {appointment.concern?.length > 40 && '...'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <StatusBadge status={appointment.status} />
+                                                        {appointment.call_status === 'in_progress' && (new Date(appointment.appointment_date).getDate() > new Date()?.getDate()) && (
+                                                            <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full animate-pulse">
+                                                                <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                                                                Live
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex items-center space-x-2">
+                                                            <Link
+                                                                to={`appointment/${appointment.id}`}
+                                                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                                                                title="View Details"
+                                                            >
+                                                                <Eye size={16} className="text-gray-500" />
+                                                            </Link>
+
+                                                            {canTakeAction && appointment?.status === 'confirmed' && (
                                                                 <>
                                                                     <button
-                                                                        onClick={() => { setSelectedAppointment(appointment); setActionType('reschedule'); setShowActionModal(true); }}
+                                                                        onClick={() => {
+                                                                            setSelectedAppointment(appointment);
+                                                                            setActionType('reschedule');
+                                                                            setShowActionModal(true);
+                                                                        }}
                                                                         className="p-1.5 hover:bg-orange-100 rounded-lg transition-colors"
                                                                         title="Reschedule"
                                                                     >
                                                                         <RefreshCw size={16} className="text-orange-600" />
                                                                     </button>
+
                                                                     <button
-                                                                        onClick={() => { setSelectedAppointment(appointment); setActionType('cancel'); setShowActionModal(true); }}
+                                                                        onClick={() => {
+                                                                            setSelectedAppointment(appointment);
+                                                                            setActionType('cancel');
+                                                                            setShowActionModal(true);
+                                                                        }}
                                                                         className="p-1.5 hover:bg-rose-100 rounded-lg transition-colors"
                                                                         title="Cancel"
                                                                     >
                                                                         <XCircle size={16} className="text-rose-600" />
                                                                     </button>
                                                                 </>
-                                                            ) : ""}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )
+                                        })}
                                     </tbody>
                                 </table>
                             </div>

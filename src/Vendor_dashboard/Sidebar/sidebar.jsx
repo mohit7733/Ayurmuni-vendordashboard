@@ -31,8 +31,7 @@ const MENU_ITEMS = [
     match: ["/vendor/products", "/vendor/new-product", "/vendor/edit-product"],
   },
   { name: "Stock Management", icon: Layers, path: "/vendor/stock" },
-  { name: "Banners", icon: Image, soon: true },
-  //  path: "/vendor/banners", 
+  { name: "Banners", icon: Image, path: "/vendor/banners" }, 
   { name: "Catalog", icon: BookOpen, path: "/vendor/catalog" },
   { name: "Orders", icon: ShoppingCart, path: "/vendor/orders", match: ["/vendor/orders", "/vendor/customers"] },
   { name: "Finance", icon: Wallet, path: "/vendor/finance", match: ["/vendor/finance"], soon: true },
@@ -99,7 +98,7 @@ const Sidebar = () => {
           key={item.name}
           type="button"
           className={`sidebar-item ${isActive ? "sidebar-item--active" : ""}`}
-          onClick={() => navigate(item.path)}
+          onClick={() => item.path && navigate(item.path)}
           title={collapsed ? item.name : undefined}
           aria-current={isActive ? "page" : undefined}
         >
