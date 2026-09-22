@@ -38,6 +38,30 @@
   width: 100%;
 }
 
+.video-call-window .crossicomn {
+  position: absolute;
+  right: 10px;
+  top: 7px;
+  background: #fff;
+  z-index: 10000;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.video-call-window button,
+.video-call-window a,
+.video-call-window .crossicomn,
+.video-call-window .video-call-no-drag {
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+
 /* Loading state */
 .loading-container {
   display: flex;

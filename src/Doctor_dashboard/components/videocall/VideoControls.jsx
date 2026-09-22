@@ -56,7 +56,7 @@ const VideoControls = ({
       initial={{ y: 50, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="fixed bottom-8 left-14 right-0 z-50"
+      className="video-call-no-drag fixed bottom-8 left-14 right-0 z-50"
     >
       <div className="flex justify-center">
         <div className="bg-black/50 backdrop-blur-xl rounded-2xl px-3 py-2 shadow-2xl border border-white/10">

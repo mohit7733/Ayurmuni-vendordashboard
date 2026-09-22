@@ -79,6 +79,18 @@ const ComingSoonAnalytics = () => (
   />
 );
 
+const VIDEO_RND_CANCEL =
+  "button, a, input, textarea, select, label, .crossicomn, .video-call-no-drag";
+
+function isVideoControlTarget(target) {
+  return Boolean(target?.closest?.(VIDEO_RND_CANCEL));
+}
+
+function keepVideoControlClick(event) {
+  if (!isVideoControlTarget(event.target)) return;
+  event.stopPropagation();
+}
+
 const ComingSoonCoupons = () => (
   <UnavailableFeature
     title="Coupons"
@@ -133,22 +145,33 @@ function App() {
         videodetails?.showCall && videodetails?.appointment && videodetails?.patient && (
           <Rnd
             default={{
-              x: (0),
-              y: 0,
-              width: 500,
-              height: 400,
+              x: 24,
+              y: Math.max(16, window.innerHeight - 574),
+              width: 550,
+              height: 550,
             }}
-            minWidth={550}
-            minHeight={550}
+            minWidth={360}
+            minHeight={420}
             bounds="window"
+            cancel={VIDEO_RND_CANCEL}
+            enableUserSelectHack={false}
             style={{
               zIndex: 9999999,
               position: "fixed",
             }}
           >
-            <div className=" fixed bottom-6 left-6 w-[550px] h-[550px] rounded-3xl overflow-hidden shadow-2xl bg-black" style={{ zIndex: "99999999999" }}>
+            <div
+              className="video-call-window relative w-full h-full rounded-3xl overflow-hidden shadow-2xl bg-black"
+              onMouseDown={keepVideoControlClick}
+              onTouchStart={keepVideoControlClick}
+            >
               <DoctorVideoCall consultationId={videodetails?.appointment?.id} patientDetails={videodetails?.patient} />
-              <span className='crossicomn' onClick={e => setvideodetails({ ...videodetails, showCall: !videodetails.showCall })}>
+              <span
+                className="crossicomn video-call-no-drag"
+                onMouseDown={(event) => event.stopPropagation()}
+                onTouchStart={(event) => event.stopPropagation()}
+                onClick={() => setvideodetails({ ...videodetails, showCall: false })}
+              >
                 <X size={16} />
               </span>
             </div>

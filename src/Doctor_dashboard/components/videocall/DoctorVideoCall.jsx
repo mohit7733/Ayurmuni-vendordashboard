@@ -699,19 +699,19 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
                   <Video size={48} className="text-gray-600 mb-3" />
                   <p className="text-gray-400 text-sm mb-4">Ready to start consultation</p>
                   {permissions.camera && permissions.microphone ? (
-                    <button
+                    <a
                       onClick={joinCall}
-                      className="px-6 py-2.5 bg-[#0a4d3e] text-white rounded-xl text-sm font-semibold hover:bg-[#0d614e] transition-all flex items-center gap-2 shadow-lg"
+                      className="video-call-no-drag px-6 py-2.5 bg-[#0a4d3e] text-white rounded-xl text-sm font-semibold hover:bg-[#0d614e] transition-all flex items-center gap-2 shadow-lg"
                     >
                       <Phone size={16} /> {joinLabel}
-                    </button>
+                    </a>
                   ) : (
-                    <button
+                    <a
                       onClick={() => window.location.reload()}
-                      className="px-5 py-2 bg-[#0a4d3e] text-white rounded-lg text-sm"
+                      className="video-call-no-drag px-5 py-2 bg-[#0a4d3e] text-white rounded-lg text-sm"
                     >
                       Refresh & Allow
-                    </button>
+                    </a>
                   )}
                 </>
               ) : (
