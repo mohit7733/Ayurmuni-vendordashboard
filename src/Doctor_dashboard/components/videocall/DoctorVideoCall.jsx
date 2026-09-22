@@ -693,7 +693,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
           )}
 
           {callState !== "active" && callState !== "joining" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10">
+            <div className="absolute inset-0 flex flex-col items-center top-15 bg-black/80 z-10">
               {callState === "idle" ? (
                 <>
                   <Video size={48} className="text-gray-600 mb-3" />
