@@ -9,15 +9,11 @@ const ProtectedRoute = ({
   const location = useLocation();
   const token = sessionStorage.getItem("accessToken");
   const userRole = sessionStorage.getItem("role");
-  const onboarding = JSON.parse(sessionStorage.getItem("profile"))
-
-
-  // Onboarding incomplete
-
-  if (onboarding?.email == null || onboarding?.email == "") {
-    return <Navigate to={userRole === "doctor"
-      ? "/doctor/onboarding"
-      : "/vendor/onboarding"} replace />;
+  let onboarding = null;
+  try {
+    onboarding = JSON.parse(sessionStorage.getItem("profile") || "null");
+  } catch {
+    onboarding = null;
   }
 
   // Check authentication
@@ -71,7 +67,15 @@ const ProtectedRoute = ({
     return <Navigate to="/unauthorized" replace />;
   }
 
-
+  // Onboarding incomplete (after auth — missing profile must not send logged-out users here)
+  if (onboarding?.email == null || onboarding?.email === "") {
+    return (
+      <Navigate
+        to={userRole === "doctor" ? "/doctor/onboarding" : "/vendor/onboarding"}
+        replace
+      />
+    );
+  }
 
   /* -------------------------------- */
   /* Vendor Verification Check */

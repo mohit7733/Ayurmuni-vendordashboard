@@ -11,6 +11,9 @@ import {
 } from "lucide-react";
 import { notificationService } from "../../services/notificationService";
 import { useVendorHeaderActionsSlot } from "../providers/VendorHeaderActionsContext";
+import PoliciesListPopup from "../../Doctor_dashboard/components/onboarding/policyslist";
+import { acceptLegalPolicies } from "../../services/policyService";
+import toast from "react-hot-toast";
 
 const VENDOR_TITLES = {
     "/vendor/dashboard": "Dashboard",
@@ -46,6 +49,9 @@ const Header = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState("");
     const profileRef = useRef(null);
+    const [policiesOpen, setPoliciesOpen] = useState(false);
+    const [allPoliciesAccepted, setallPoliciesAccepted] = useState(false);
+
     const role = sessionStorage.getItem("role") || "vendor";
     const isVendor = role === "vendor";
     const [user, setUser] = useState({
@@ -55,12 +61,17 @@ const Header = () => {
         last_name: "",
         avatar: "",
         business_name: "",
+        policies_accepted: false,
     });
 
     useEffect(() => {
-        setUser(JSON.parse(sessionStorage.getItem("profile") || "null") || {});
+        const userdata = JSON.parse(sessionStorage.getItem("profile") || "null");
+        setUser(userdata || {});
+        setPoliciesOpen(userdata?.policies_accepted === false);
         fetchNotifications();
     }, []);
+
+
 
     useEffect(() => {
         const handleClick = (e) => {
@@ -81,7 +92,27 @@ const Header = () => {
         }
     };
 
-    const LogOut = () => {
+    // const handlePoliciesAcceptChange = (accepted) => {
+    //     setallPoliciesAccepted(accepted);
+    // }
+
+    const postpoliciesAccepted = async () => {
+        try {
+            const response = await acceptLegalPolicies("all");
+            console.log("Policies accepted response:", response);
+            if (response?.success) {
+                toast.success("Policies accepted successfully!");
+                setPoliciesOpen(false);
+                const updatedUser = { ...user, policies_accepted: true };
+                setUser(updatedUser);
+                sessionStorage.setItem("profile", JSON.stringify(updatedUser));
+            }
+        } catch (error) {
+            console.error("Error accepting policies:", error);
+        }
+    };
+
+    const LogOutprofile = () => {
         sessionStorage.clear();
         setTimeout(() => window.location.replace("/login"), 300);
     };
@@ -104,6 +135,17 @@ const Header = () => {
         setSearchQuery("");
     };
 
+    if (user?.policies_accepted === false) {
+        return (
+            <PoliciesListPopup
+                open={policiesOpen}
+                // onClose={() => setPoliciesOpen(false)}
+                accepted={allPoliciesAccepted}
+                onAcceptChange={postpoliciesAccepted}
+            />
+        )
+    }
+
     if (!isVendor) {
         return (
             <header className="header header--legacy fixed top-0 right-0 z-30">
@@ -115,24 +157,76 @@ const Header = () => {
                     </div>
                 </div>
                 <div className="header-right">
-                    <button type="button" className="icon-wrapper" onClick={() => navigate(`/${role}/notifications`)} aria-label="Notifications">
+                    {/* Notifications */}
+                    <button
+                        type="button"
+                        className="icon-wrapper"
+                        onClick={() => navigate(`/${role}/notifications`)}
+                        aria-label="Notifications"
+                    >
                         <Bell size={18} />
-                        {unreadCount > 0 && <span className="badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
-                    </button>
-                    <div className="profile" ref={profileRef} onClick={() => setOpenProfile(!openProfile)}>
-                        {user?.avatar ? (
-                            <img src={user.avatar} alt="" className="avatar" />
-                        ) : (
-                            <div className="avatar-placeholder">{user?.first_name?.charAt(0) || "U"}</div>
+
+                        {unreadCount > 0 && (
+                            <span className="badge">
+                                {unreadCount > 99 ? "99+" : unreadCount}
+                            </span>
                         )}
+                    </button>
+
+                    {/* Profile */}
+                    <div
+                        className="profile"
+                        ref={profileRef}
+                        onClick={() => setOpenProfile((prev) => !prev)}
+                    >
+                        {user?.avatar ? (
+                            <img
+                                src={user.avatar}
+                                alt={displayName || "User"}
+                                className="avatar"
+                            />
+                        ) : (
+                            <div className="avatar-placeholder">
+                                {user?.first_name?.charAt(0)?.toUpperCase() || "U"}
+                            </div>
+                        )}
+
                         <div className="profile-info">
-                            <p className="name capitalize">{namePrefix}{displayName}</p>
-                            <span className="role">{role.toUpperCase()}</span>
+                            <p className="name capitalize">
+                                {namePrefix}
+                                {displayName}
+                            </p>
+
+                            <span className="role">
+                                {role?.toUpperCase()}
+                            </span>
                         </div>
+
+                        {/* Profile Dropdown */}
                         {openProfile && (
-                            <div className="profile-dropdown">
-                                <div onClick={() => navigate(`/${role}/profile`)}>Profile</div>
-                                <div className="logout" onClick={LogOut}>Logout</div>
+                            <div
+                                className="profile-dropdown"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div
+                                    className="dropdown-item"
+                                    onClick={() => {
+                                        setOpenProfile(false);
+                                        navigate(`/${role}/profile`);
+                                    }}
+                                >
+                                    Profile
+                                </div>
+
+                                <div
+                                    className="dropdown-item logout"
+                                    onClick={() => {
+                                        setOpenProfile(false);
+                                        LogOutprofile();
+                                    }}
+                                >
+                                    Logout
+                                </div>
                             </div>
                         )}
                     </div>
@@ -168,8 +262,12 @@ const Header = () => {
 
                 <div className="vendor-header__actions">
                     {pageActions && (
-                        <div className="vendor-header__page-actions">{pageActions}</div>
+                        <div className="vendor-header__page-actions">
+                            {pageActions}
+                        </div>
                     )}
+
+                    {/* Notifications */}
                     <button
                         type="button"
                         className="vendor-header__icon-btn ds-focus"
@@ -177,43 +275,93 @@ const Header = () => {
                         aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
                     >
                         <Bell size={18} />
+
                         {unreadCount > 0 && (
-                            <span className="vendor-header__badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+                            <span className="vendor-header__badge">
+                                {unreadCount > 99 ? "99+" : unreadCount}
+                            </span>
                         )}
                     </button>
 
-                    <div className="vendor-header__profile" ref={profileRef}>
+                    {/* Profile */}
+                    <div
+                        className="vendor-header__profile"
+                        ref={profileRef}
+                    >
                         <button
                             type="button"
                             className="vendor-header__profile-btn ds-focus"
-                            onClick={() => setOpenProfile(!openProfile)}
+                            onClick={() => setOpenProfile((prev) => !prev)}
                             aria-expanded={openProfile}
                             aria-haspopup="menu"
                         >
                             {user?.avatar ? (
-                                <img src={user.avatar} alt="" className="vendor-header__avatar" />
+                                <img
+                                    src={user.avatar}
+                                    alt={displayName || "User"}
+                                    className="vendor-header__avatar"
+                                />
                             ) : (
-                                <div className="vendor-header__avatar vendor-header__avatar--placeholder">
-                                    {user?.first_name?.charAt(0) || "V"}
+                                <div
+                                    className="vendor-header__avatar vendor-header__avatar--placeholder"
+                                    aria-hidden="true"
+                                >
+                                    {user?.first_name?.charAt(0)?.toUpperCase() || "V"}
                                 </div>
                             )}
-                            <span className="hidden lg:block vendor-header__profile-name capitalize">{displayName}</span>
+
+                            <span className="hidden lg:block vendor-header__profile-name capitalize">
+                                {displayName}
+                            </span>
                         </button>
 
                         {openProfile && (
-                            <div className="vendor-header__dropdown" role="menu">
-                                <div className="vendor-header__dropdown-header">
-                                    <p className="font-semibold text-gray-900 capitalize">{displayName}</p>
-                                    <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-                                </div>
-                                <button type="button" role="menuitem" onClick={() => { navigate("/vendor/profile"); setOpenProfile(false); }}>
-                                    <User size={16} /> Profile
+                            <div
+                                className="vendor-header__dropdown"
+                                role="menu"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {/* <div className="vendor-header__dropdown-header">
+                                    <p className="font-semibold text-gray-900 capitalize">
+                                        {displayName}
+                                    </p>
+
+                                    <p className="text-xs text-gray-500 truncate">
+                                        {user?.email}
+                                    </p>
+                                </div> */}
+
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                        setOpenProfile(false);
+                                        navigate("/vendor/profile");
+                                    }}
+                                >
+                                    <User size={16} />
+                                    <span>Profile</span>
                                 </button>
-                                <button type="button" role="menuitem" onClick={() => { navigate("/vendor/profile?tab=settings"); setOpenProfile(false); }}>
-                                    <Settings size={16} /> Settings
+
+                                <button
+                                    type="button"
+                                    role="menuitem"
+                                    onClick={() => {
+                                        setOpenProfile(false);
+                                        navigate("/vendor/profile?tab=settings");
+                                    }}
+                                >
+                                    <Settings size={16} />
+                                    <span>Settings</span>
                                 </button>
-                                <button type="button" role="menuitem" className="vendor-header__logout" onClick={LogOut}>
-                                    <LogOut size={16} /> Sign out
+
+                                <button
+                                    role="menuitem"
+                                    className="vendor-header__logout"
+                                    onClick={LogOutprofile}
+                                >
+                                    <LogOut size={16} />
+                                    <span>Sign out</span>
                                 </button>
                             </div>
                         )}

@@ -63,6 +63,27 @@ const formatDuration = (seconds) =>
     .toString()
     .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 
+const getEndTimeTimestamp = (endTime) => {
+  if (!endTime) return null;
+
+  const timeOnlyMatch = String(endTime).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (timeOnlyMatch) {
+    const today = new Date();
+    today.setHours(
+      Number(timeOnlyMatch[1]),
+      Number(timeOnlyMatch[2]),
+      Number(timeOnlyMatch[3] || 0),
+      0
+    );
+    return today.getTime();
+  }
+
+  const timestamp = new Date(endTime).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+};
+
+const VIDEO_PLAY_CONFIG = { fit: "contain" };
+
 export default function DoctorVideoCall({ consultationId: consultationIdProp, patientDetails, onCallEnd }) {
   const { consultationId: consultationIdParam } = useParams();
   const consultationId = consultationIdProp || consultationIdParam;
@@ -75,6 +96,8 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
   const [patientJoined, setPatientJoined] = useState(false);
   const [error, setError] = useState(null);
   const [duration, setDuration] = useState(0);
+  const [timeUntilEnd, setTimeUntilEnd] = useState(null);
+  const notifiedEndWarningsRef = useRef(new Set());
   const [networkQuality, setNetworkQuality] = useState(4);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -98,6 +121,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
   const pipPositionRef = useRef({ x: 0, y: 0 });
   const isInChannelRef = useRef(false);
   const callStateRef = useRef("idle");
+  const remoteUserRef = useRef(null);
 
   const [permissions, setPermissions] = useState({ camera: false, microphone: false });
   const [checkingPermissions, setCheckingPermissions] = useState(true);
@@ -124,6 +148,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
 
   const cleanupAgora = useCallback(async () => {
     isInChannelRef.current = false;
+    remoteUserRef.current = null;
     clearInterval(timerRef.current);
 
     const { audio, video } = localTracksRef.current;
@@ -284,11 +309,28 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
     return () => navigator.mediaDevices.removeEventListener("devicechange", getDevices);
   }, [getDevices]);
 
+  const playLocalVideo = useCallback(() => {
+    const { video } = localTracksRef.current;
+    if (!video || !localVideoRef.current) return;
+    video.play(localVideoRef.current, VIDEO_PLAY_CONFIG);
+  }, []);
+
+  const playRemoteVideo = useCallback((track) => {
+    if (!track || !remoteVideoRef.current) return;
+    track.play(remoteVideoRef.current, VIDEO_PLAY_CONFIG);
+  }, []);
+
   useEffect(() => {
-    if (callState === "active" && localTracksRef.current.video && localVideoRef.current) {
-      localTracksRef.current.video.play(localVideoRef.current);
+    if (callState === "active") {
+      playLocalVideo();
     }
-  }, [callState]);
+  }, [callState, playLocalVideo]);
+
+  useEffect(() => {
+    if (patientJoined && remoteUserRef.current?.videoTrack) {
+      playRemoteVideo(remoteUserRef.current.videoTrack);
+    }
+  }, [patientJoined, playRemoteVideo]);
 
   useEffect(() => {
     if (isRecording) {
@@ -301,6 +343,42 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
     }
     return () => clearInterval(recordingTimerRef.current);
   }, [isRecording]);
+
+  useEffect(() => {
+    const endTime = getEndTimeTimestamp(patientDetails?.end_time);
+    if (!endTime || callState !== "active") {
+      setTimeUntilEnd(null);
+      notifiedEndWarningsRef.current.clear();
+      return undefined;
+    }
+
+    const updateTimeUntilEnd = () => {
+      const remainingSeconds = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+      setTimeUntilEnd(remainingSeconds);
+
+      const warningMessages = {
+        300: "Your meeting will end in 5 minutes",
+        120: "Your meeting will end in 2 minutes",
+        30: "Your meeting will end in 30 seconds",
+      };
+
+      Object.entries(warningMessages).forEach(([threshold, message]) => {
+        const thresholdSeconds = Number(threshold);
+        if (
+          remainingSeconds <= thresholdSeconds &&
+          remainingSeconds > 0 &&
+          !notifiedEndWarningsRef.current.has(thresholdSeconds)
+        ) {
+          notifiedEndWarningsRef.current.add(thresholdSeconds);
+          toast(message);
+        }
+      });
+    };
+
+    updateTimeUntilEnd();
+    const endTimeTimer = setInterval(updateTimeUntilEnd, 1000);
+    return () => clearInterval(endTimeTimer);
+  }, [callState, patientDetails?.end_time]);
 
   const joinCall = useCallback(async () => {
     setCallState("joining");
@@ -342,18 +420,16 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
       client.on("user-published", async (user, mediaType) => {
         await client.subscribe(user, mediaType);
         if (mediaType === "video") {
+          remoteUserRef.current = user;
           setPatientJoined(true);
-          setTimeout(() => {
-            if (remoteVideoRef.current && user.videoTrack) {
-              user.videoTrack.play(remoteVideoRef.current);
-            }
-          }, 100);
+          playRemoteVideo(user.videoTrack);
         }
         if (mediaType === "audio") user.audioTrack.play();
       });
 
       client.on("user-unpublished", (user) => user.videoTrack?.stop());
       client.on("user-left", () => {
+        remoteUserRef.current = null;
         handleRemoteUserLeft();
       });
       client.on("network-quality", (stats) =>
@@ -379,6 +455,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
       // Alternative: Create tracks with more explicit constraints
       const [audioTrack, videoTrack] = await AgoraRTC.createMicrophoneAndCameraTracks(
         {
+          AEC: true,
           AGC: true,
           ANS: true,
         },
@@ -386,11 +463,12 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
           encoderConfig: {
             width: 640,
             height: 480,
-            frameRate: 30,
-            bitrateMin: 400,
-            bitrateMax: 800,
+            frameRate: 24,
+            bitrateMin: 200,
+            bitrateMax: 600,
           },
           facingMode: "user",
+          optimizationMode: "motion",
         }
       );
       localTracksRef.current = { audio: audioTrack, video: videoTrack };
@@ -413,6 +491,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
     loadCallStatus,
     permissions,
     handleRemoteUserLeft,
+    playRemoteVideo,
     reconcilePresence,
   ]);
 
@@ -477,10 +556,14 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
   const toggleCamera = useCallback(async () => {
     const { video } = localTracksRef.current;
     if (!video) return;
-    await video.setEnabled(isCameraOff);
-    setIsCameraOff(!isCameraOff);
-    toast(isCameraOff ? "Camera started" : "Camera stopped");
-  }, [isCameraOff]);
+    const nextCameraOff = !isCameraOff;
+    await video.setEnabled(!nextCameraOff);
+    setIsCameraOff(nextCameraOff);
+    if (!nextCameraOff) {
+      playLocalVideo();
+    }
+    toast(nextCameraOff ? "Camera stopped" : "Camera started");
+  }, [isCameraOff, playLocalVideo]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -504,9 +587,10 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
 
     if (nextDevice) {
       await video.setDevice(nextDevice.deviceId);
+      playLocalVideo();
       toast.success("Camera switched");
     }
-  }, []);
+  }, [playLocalVideo]);
 
   const onDragEnd = (event, info) => {
     pipPositionRef.current = { x: info.point.x, y: info.point.y };
@@ -582,6 +666,11 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
       ref={containerRef}
       className="relative min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 overflow-hidden"
     >
+      {timeUntilEnd !== null && timeUntilEnd > 0 && timeUntilEnd <= 300 && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2  rounded-lg bg-amber-500/95 px-4 py-2 text-center text-sm font-semibold text-white shadow-lg" style={{ zIndex: 1000 }}>
+          Meeting ends in {formatDuration(timeUntilEnd)}
+        </div>
+      )}
       <VideoHeader
         patientName={patientDetails?.first_name}
         duration={duration}
@@ -594,32 +683,35 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
 
       <div className="relative h-[100vh] mx-4">
         <div className="relative w-full h-full bg-black/50 rounded-2xl overflow-hidden shadow-2xl">
-          <div ref={remoteVideoRef} className="absolute inset-0" />
+          <div
+            ref={remoteVideoRef}
+            className="video-call-player absolute inset-0 bg-black"
+          />
 
           {!patientJoined && callState === "active" && (
             <WaitingScreen patientName={patientDetails?.first_name} />
           )}
 
           {callState !== "active" && callState !== "joining" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10">
+            <div className="absolute inset-0 flex flex-col items-center top-10 bg-black/80 z-10">
               {callState === "idle" ? (
                 <>
                   <Video size={48} className="text-gray-600 mb-3" />
                   <p className="text-gray-400 text-sm mb-4">Ready to start consultation</p>
                   {permissions.camera && permissions.microphone ? (
-                    <button
+                    <a
                       onClick={joinCall}
-                      className="px-6 py-2.5 bg-[#0a4d3e] text-white rounded-xl text-sm font-semibold hover:bg-[#0d614e] transition-all flex items-center gap-2 shadow-lg"
+                      className="video-call-no-drag px-6 py-2.5 bg-[#0a4d3e] text-white rounded-xl text-sm font-semibold hover:bg-[#0d614e] transition-all flex items-center gap-2 shadow-lg"
                     >
                       <Phone size={16} /> {joinLabel}
-                    </button>
+                    </a>
                   ) : (
-                    <button
+                    <a
                       onClick={() => window.location.reload()}
-                      className="px-5 py-2 bg-[#0a4d3e] text-white rounded-lg text-sm"
+                      className="video-call-no-drag px-5 py-2 bg-[#0a4d3e] text-white rounded-lg text-sm"
                     >
                       Refresh & Allow
-                    </button>
+                    </a>
                   )}
                 </>
               ) : (

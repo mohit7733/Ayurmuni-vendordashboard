@@ -280,13 +280,14 @@ const DoDontsList = () => {
     useEffect(() => {
         const loadDiseases = async () => {
             try {
-                const [doctorRes, vendorRes] = await Promise.allSettled([
+                const [doctorRes] = await Promise.allSettled([
                     doctorService.getPrakritiAndDiseases(),
-                    vendorService.getbrandandcategory("health-diseases"),
+                    // vendorService.getbrandandcategory("health-diseases"),
                 ]);
                 const doctorList = doctorRes.status === "fulfilled" ? normalizeDiseases(doctorRes.value) : [];
-                const vendorList = vendorRes.status === "fulfilled" ? normalizeDiseases(vendorRes.value) : [];
-                setDiseases(vendorList.length ? vendorList : doctorList);
+                // const vendorList = vendorRes.status === "fulfilled" ? normalizeDiseases(vendorRes.value) : [];
+                // vendorList.length ? vendorList :
+                setDiseases(doctorList);
             } catch (error) {
                 console.error("Failed to load health conditions", error);
             }

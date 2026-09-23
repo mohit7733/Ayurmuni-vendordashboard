@@ -8,8 +8,10 @@ import {
     Shield, Info, ArrowLeft, Sparkles
 } from 'lucide-react';
 import { doctorService } from '../../../services/doctorService';
+import { acceptLegalPolicies } from '../../../services/policyService';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import PoliciesListPopup from './policyslist';
 
 // ==================== CONSTANTS ====================
 const TITLES = ['Dr.', 'Prof.', 'Dr. (Prof.)'];
@@ -95,6 +97,7 @@ const INITIAL_FORM_STATE = {
     },
     agreements: {
         termsAccepted: false, privacyAccepted: false, communicationAccepted: false,
+        allPoliciesAccepted: false,
         agreeDate: new Date().toISOString().split('T')[0]
     }
 };
@@ -154,9 +157,6 @@ const transformToApiFormat = (formData) => ({
     twitter_url: formData.socialMedia.socialMedia.twitter,
     facebook_url: formData.socialMedia.socialMedia.facebook,
     instagram_url: formData.socialMedia.socialMedia.instagram,
-    terms_of_service: formData.agreements.termsAccepted,
-    privacy_policy: formData.agreements.privacyAccepted,
-    communication_accepted: formData.agreements.communicationAccepted,
     bank_name: formData.bankInfo.bankName,
     account_number: formData.bankInfo.accountNumber,
     ifsc_code: formData.bankInfo.ifscCode,
@@ -165,7 +165,6 @@ const transformToApiFormat = (formData) => ({
     upi_id: formData.bankInfo.upiId,
     payment_terms: formData.bankInfo.paymentTerms,
     is_selected: true,
-
 
     medical_degree_certificate: removePreview(formData.documents.medicalDegree),
     registration_certificate: removePreview(formData.documents.registrationCertificate),
@@ -486,6 +485,7 @@ const DoctorOnboarding = () => {
     const fileInputRefs = useRef({});
     const [errors, setErrors] = useState({});
     const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+    const [policiesOpen, setPoliciesOpen] = useState(false);
 
     // ==================== HANDLER FUNCTIONS ====================
     const handleInputChange = useCallback((section, field, value) => {
@@ -654,9 +654,9 @@ const DoctorOnboarding = () => {
                 break;
 
             case 6:
-                if (!formData.agreements.termsAccepted) newErrors.termsAccepted = "Accept terms & conditions";
-                if (!formData.agreements.privacyAccepted) newErrors.privacyAccepted = "Accept privacy policy";
-                if (!formData.agreements.communicationAccepted) newErrors.communicationAccepted = "Accept communication policy";
+                if (!formData.agreements.allPoliciesAccepted) {
+                    newErrors.allPoliciesAccepted = "Please review and accept all policies";
+                }
                 break;
 
             default: break;
@@ -687,9 +687,28 @@ const DoctorOnboarding = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, []);
 
+    const handlePoliciesAcceptChange = useCallback((accepted) => {
+        setFormData((prev) => ({
+            ...prev,
+            agreements: {
+                ...prev.agreements,
+                allPoliciesAccepted: accepted,
+                termsAccepted: accepted,
+                privacyAccepted: accepted,
+            },
+        }));
+        if (accepted) {
+            setErrors((prev) => ({ ...prev, allPoliciesAccepted: "" }));
+        }
+    }, []);
+
     // ==================== SUBMIT ====================
     const handleSubmit = useCallback(async () => {
-        if (!formData.agreements.termsAccepted || !formData.agreements.privacyAccepted || !formData.agreements.communicationAccepted) {
+        if (!formData.agreements.allPoliciesAccepted) {
+            setErrors((prev) => ({
+                ...prev,
+                allPoliciesAccepted: "Please review and accept all policies",
+            }));
             return;
         }
 
@@ -704,6 +723,13 @@ const DoctorOnboarding = () => {
         try {
             const response = await doctorService.createOnboarding(transformToApiFormat(formData));
             if (response?.data?.success) {
+                try {
+                    await acceptLegalPolicies("all");
+                } catch (policyError) {
+                    console.error(policyError);
+                    toast.error(policyError?.message || "Profile saved, but policy acceptance failed");
+                }
+
                 const localdata = {
                     phone_number: formData?.contactInfo?.phone,
                     email: formData?.contactInfo?.email,
@@ -926,7 +952,7 @@ const DoctorOnboarding = () => {
                                             onChange={(e) => handleInputChange('professionalInfo', 'followUpFee', e.target.value)}
                                             type="number" placeholder="Amount in INR" />
 
-                                        <FormInput  label="Average Consultation Time (minutes)" name="averageConsultationTime" value={formData.professionalInfo.averageConsultationTime}
+                                        <FormInput label="Average Consultation Time (minutes)" name="averageConsultationTime" value={formData.professionalInfo.averageConsultationTime}
                                             // onChange={(e) => handleInputChange('professionalInfo', 'averageConsultationTime', e.target.value)}
                                             type="number" placeholder="Average time spent per consultation" />
 
@@ -1023,46 +1049,38 @@ const DoctorOnboarding = () => {
                             {/* Step 6: Agreement */}
                             {currentStep === 6 && (
                                 <div className="space-y-6">
-                                    <SectionHeader title="Terms & Agreement" description="Review and accept the terms" />
+                                    <SectionHeader icon={Shield} title="Terms of Service & Privacy Policy" description="Review and accept the terms" />
 
-                                    <div className="bg-gray-50 rounded-lg p-6 h-64 overflow-y-auto">
-                                        <h3 className="font-bold text-gray-800 mb-4">Terms of Service</h3>
-                                        <div className="space-y-3 text-sm text-gray-600">
-                                            <p>1. The doctor agrees to provide accurate and truthful information during the onboarding process.</p>
-                                            <p>2. All medical certificates and documents submitted must be genuine and valid.</p>
-                                            <p>3. The doctor must adhere to the professional code of conduct as per medical council guidelines.</p>
-                                            <p>4. AyurMuni reserves the right to verify all submitted documents.</p>
-                                            <p>5. The doctor is responsible for maintaining patient confidentiality and data privacy.</p>
-                                            <p>6. Consultation fees and revenue sharing terms will be as per the agreement.</p>
-                                            <p>7. The doctor must inform AyurMuni of any changes to their registration or practice status.</p>
-                                            <p>8. AyurMuni may suspend or terminate the account if terms are violated.</p>
+                                    <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-5">
+                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-800">
+                                                    Legal policies
+                                                </p>
+                                                <p className="mt-1 text-sm text-gray-500">
+                                                    Open the list, read each policy by name, then accept all.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPoliciesOpen(true)}
+                                                className="inline-flex items-center justify-center rounded-lg bg-[#0D614E] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#0a4f3f]"
+                                            >
+                                                {formData.agreements.allPoliciesAccepted
+                                                    ? "View policies"
+                                                    : "Review & accept policies"}
+                                            </button>
                                         </div>
-                                    </div>
 
-                                    <div className="space-y-4">
-                                        <label className="flex items-center space-x-3">
-                                            <input type="checkbox" checked={formData.agreements.termsAccepted}
-                                                onChange={(e) => handleInputChange('agreements', 'termsAccepted', e.target.checked)}
-                                                className="w-5 h-5 rounded border-gray-300 text-[#0D614E] focus:ring-[#0D614E]" />
-                                            <span className="text-gray-700">I have read and agree to the Terms of Service</span>
-                                        </label>
-                                        {errors.termsAccepted && <p className="text-red-500 text-sm">{errors.termsAccepted}</p>}
-
-                                        <label className="flex items-center space-x-3">
-                                            <input type="checkbox" checked={formData.agreements.privacyAccepted}
-                                                onChange={(e) => handleInputChange('agreements', 'privacyAccepted', e.target.checked)}
-                                                className="w-5 h-5 rounded border-gray-300 text-[#0D614E] focus:ring-[#0D614E]" />
-                                            <span className="text-gray-700">I have read and agree to the Privacy Policy</span>
-                                        </label>
-                                        {errors.privacyAccepted && <p className="text-red-500 text-sm">{errors.privacyAccepted}</p>}
-
-                                        <label className="flex items-center space-x-3">
-                                            <input type="checkbox" checked={formData.agreements.communicationAccepted}
-                                                onChange={(e) => handleInputChange('agreements', 'communicationAccepted', e.target.checked)}
-                                                className="w-5 h-5 rounded border-gray-300 text-[#0D614E] focus:ring-[#0D614E]" />
-                                            <span className="text-gray-700">I agree to receive communication from AyurMuni regarding my application and platform updates</span>
-                                        </label>
-                                        {errors.communicationAccepted && <p className="text-red-500 text-sm">{errors.communicationAccepted}</p>}
+                                        {formData.agreements.allPoliciesAccepted ? (
+                                            <p className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-emerald-700">
+                                                <CheckCircle size={16} />
+                                                All policies accepted
+                                            </p>
+                                        ) : null}
+                                        {errors.allPoliciesAccepted && (
+                                            <p className="mt-3 text-sm text-red-500">{errors.allPoliciesAccepted}</p>
+                                        )}
                                     </div>
 
                                     <div className="border-t border-gray-200 pt-6">
@@ -1074,6 +1092,13 @@ const DoctorOnboarding = () => {
                                             </div>
                                         </div>
                                     </div>
+
+                                    <PoliciesListPopup
+                                        open={policiesOpen}
+                                        onClose={() => setPoliciesOpen(false)}
+                                        accepted={formData.agreements.allPoliciesAccepted}
+                                        onAcceptChange={handlePoliciesAcceptChange}
+                                    />
                                 </div>
                             )}
                         </div>
@@ -1094,7 +1119,7 @@ const DoctorOnboarding = () => {
                                     <span>Next</span><ChevronRight size={18} />
                                 </button>
                             ) : (
-                                <button type="submit" disabled={isSubmitting || !formData.agreements.termsAccepted || !formData.agreements.privacyAccepted || !formData.agreements.communicationAccepted}
+                                <button type="submit" disabled={isSubmitting || !formData.agreements.allPoliciesAccepted}
                                     className="flex items-center space-x-2 px-8 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all disabled:opacity-50">
                                     {isSubmitting ? (
                                         <><RefreshCw size={18} className="animate-spin" /><span>Submitting...</span></>

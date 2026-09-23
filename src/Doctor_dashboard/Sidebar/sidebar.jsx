@@ -30,7 +30,7 @@ const DoctorSidebar = () => {
     { name: "Appointment", icon: <Appointment />, path: "/doctor/appointments" },
     { name: "Patients", icon: <Patients />, path: "/doctor/patients" },
     { name: "Messanger", icon: <Message />, path: "/doctor/messenger" },
-    { name: "Earnings", icon: <FinanceIcon />, path: "/doctor/earnings" },
+    // { name: "Earnings", icon: <FinanceIcon />, path: "/doctor/earnings" },
     isdietitian && {
       name: "Diets",
       icon: <Bowlrice />,

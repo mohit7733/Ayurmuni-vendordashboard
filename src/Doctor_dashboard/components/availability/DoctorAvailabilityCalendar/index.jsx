@@ -10,6 +10,7 @@ import BookingDetailsModal from '../components/BookingDetailsModal';
 import AvailabilityStats from '../components/AvailabilityStats';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import { useCalendarData } from '../hooks/useCalendarData';
+import { getRequiredconfigurationsPolicies } from '../../../../services/policyService';
 
 const DoctorAvailabilityCalendar2 = () => {
     const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -17,12 +18,38 @@ const DoctorAvailabilityCalendar2 = () => {
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [editingSlot, setEditingSlot] = useState(null);
     const [selectedSlotDetails, setSelectedSlotDetails] = useState(null);
+    const [adminamount, setadminamount] = useState({
+        global_fee: null,
+        duration_minutes: null,
+    });
+
 
     const { slots, appointments, isLoading, baseamount, fetchMonthData, addSlot, updateSlot, deleteSlot } = useCalendarData();
 
     useEffect(() => {
         fetchMonthData(currentMonth);
     }, [currentMonth, fetchMonthData]);
+
+    const fetchBaseAmount = useCallback(async () => {
+        try {
+            const response = await getRequiredconfigurationsPolicies("doctor_services");
+            if (response) {
+                if (response?.configuration?.consultation?.fee?.global_fee) {
+                    setadminamount({
+                        global_fee: response?.configuration?.consultation?.fee?.global_fee,
+                        duration_minutes: response?.configuration?.consultation?.duration_minutes,
+                    });
+                }
+            }
+        } catch (error) {
+            console.error("Error fetching base amount:", error);
+        }
+
+    }, []);
+
+    useEffect(() => {
+        fetchBaseAmount();
+    }, [fetchBaseAmount]);
 
     // const modelclose = () => {
     //     setEditingSlot(null)
@@ -127,6 +154,7 @@ const DoctorAvailabilityCalendar2 = () => {
                     onSave={handleAddSlot}
                     onUpdate={handleUpdateSlot}
                     baseamount={baseamount}
+                    adminamount={adminamount}
                 />
 
                 <BookingDetailsModal

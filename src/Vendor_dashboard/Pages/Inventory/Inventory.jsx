@@ -85,9 +85,9 @@ function VariantRow({ product, variant, onToggleStatus }) {
       <td className="font-semibold text-[#0D614E]">₹{Number(variant.selling_price || 0).toLocaleString()}</td>
       <td>{qty} units</td>
       <td><StatusBadge status={stockStatus} /></td>
-      <td className="flex items-center gap-2">
+      <td className=" items-center gap-2">
         <StatusBadge status={variant.status || "draft"} />
-        <button type="button" className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-600 transition hover:bg-gray-50" onClick={() => onToggleStatus(product.id, variant.id, variant.status === "active" ? "inactive" : "active")}>
+        <button type="button" className="ml-4 rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-600 transition hover:bg-[#0D614E] hover:text-white" onClick={() => onToggleStatus(product.id, variant.id, variant.status === "active" ? "inactive" : "active")}>
           {variant.status === "active" ? "Inactive" : "Active"}
         </button>
       </td>

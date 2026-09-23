@@ -1542,7 +1542,7 @@ const DoctorProfile = () => {
             // emergency_contact_name: { pattern: /^[a-zA-Z\s]{2,50}$/, name: 'Emergency Contact Name' },
             // emergency_contact_relation: { pattern: /^[a-zA-Z\s]{2,30}$/, name: 'Emergency Contact Relation' },
             emergency_contact_phone: { pattern: VALIDATION_PATTERNS.phone, name: 'Emergency Phone' },
-            bio: { pattern: /^[\s\S]{10,500}$/, name: 'Bio' },
+            // bio: { pattern: /^[\s\S]{10,500}$/, name: 'Bio' },
             // address_line: { pattern: /^[a-zA-Z0-9\s,.\-/#]{5,100}$/, name: 'Address' }
         };
         const config = patterns[field];

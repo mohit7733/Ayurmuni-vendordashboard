@@ -411,6 +411,11 @@ const VendorProfile = () => {
             if (response?.data?.success) {
                 toast.success('Profile updated successfully!');
                 setIsEditing(false);
+                let data = JSON.parse(sessionStorage.getItem('profile'));
+                if (data) {
+                    const profile = { ...data, business_name: vendorData.business_name};
+                    sessionStorage.setItem('profile', JSON.stringify(profile)); // Update sessionStorage with new business name
+                }
                 fetchVendorProfile();
             } else {
                 toast.error(response?.data?.message || 'Failed to update profile');

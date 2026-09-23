@@ -64,6 +64,8 @@ const formatDuration = (seconds) =>
     .toString()
     .padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 
+const VIDEO_PLAY_CONFIG = { fit: "contain" };
+
 export default function PatientVideoCallWeb({ doctorName = "Doctor", onCallEnd }) {
   const { token: urlAuthToken, consultationId } = useParams();
   const accessToken =
@@ -175,7 +177,7 @@ export default function PatientVideoCallWeb({ doctorName = "Doctor", onCallEnd }
     const { video } = localTracksRef.current;
     if (!video || !localVideoRef.current || isCameraOffRef.current) return;
     try {
-      await video.play(localVideoRef.current);
+      await video.play(localVideoRef.current, VIDEO_PLAY_CONFIG);
     } catch (err) {
       console.warn("Local video play failed:", err);
     }
@@ -184,7 +186,7 @@ export default function PatientVideoCallWeb({ doctorName = "Doctor", onCallEnd }
   const playRemoteVideo = useCallback((track) => {
     if (!track || !remoteVideoRef.current) return;
     try {
-      track.play(remoteVideoRef.current);
+      track.play(remoteVideoRef.current, VIDEO_PLAY_CONFIG);
     } catch (err) {
       console.warn("Remote video play failed:", err);
     }
@@ -321,7 +323,7 @@ export default function PatientVideoCallWeb({ doctorName = "Doctor", onCallEnd }
         if (mediaType === "video") {
           setDoctorJoined(true);
           toast.success("Doctor has joined the consultation", { id: "join" });
-          setTimeout(() => playRemoteVideo(user.videoTrack), 100);
+          playRemoteVideo(user.videoTrack);
         }
 
         if (mediaType === "audio" && user.audioTrack) {
@@ -369,10 +371,21 @@ export default function PatientVideoCallWeb({ doctorName = "Doctor", onCallEnd }
         });
       }
 
-      const audioTrack = await AgoraRTC.createMicrophoneAudioTrack();
+      const audioTrack = await AgoraRTC.createMicrophoneAudioTrack({
+        AEC: true,
+        AGC: true,
+        ANS: true,
+      });
       const videoTrack = await AgoraRTC.createCameraVideoTrack({
-        encoderConfig: "720p_1",
+        encoderConfig: {
+          width: 640,
+          height: 480,
+          frameRate: 24,
+          bitrateMin: 200,
+          bitrateMax: 600,
+        },
         facingMode: "user",
+        optimizationMode: "motion",
       });
 
       localTracksRef.current = { audio: audioTrack, video: videoTrack };
@@ -581,7 +594,7 @@ export default function PatientVideoCallWeb({ doctorName = "Doctor", onCallEnd }
         <div className="relative w-full h-full !min-h-[86.5vh] sm:min-h-0 bg-black/60 rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-white/5 ">
           <div
             ref={remoteVideoRef}
-            className="absolute inset-0 [&_video]:object-cover [&_video]:w-full [&_video]:h-full"
+            className="video-call-player absolute inset-0 bg-black [&_video]:object-contain [&_video]:w-full [&_video]:h-full"
           />
 
           {!doctorJoined && callState === "active" && (

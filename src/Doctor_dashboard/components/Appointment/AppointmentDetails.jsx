@@ -1645,7 +1645,8 @@ const AppointmentDetail = ({ videodetails }) => {
         );
     }
 
-    const patient = appointment?.patient;
+
+    const patient = { ...appointment?.patient, end_time: appointment?.end_time };
     const doctor = appointment?.doctor;
     const initials = getInitials(patient?.first_name, patient?.last_name);
     const ConsultationIcon = CONSULTATION_TYPES[appointment?.consultation_type]?.icon || Video;
@@ -2066,7 +2067,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                                         <button
                                                                                             type="button"
                                                                                             key={item.id}
-                                                                                            onClick={() => selectMedicine(item)}
+                                                                                            onClick={() => item?.status !== 'out_of_stock' && selectMedicine(item)}
                                                                                             className="w-full text-left px-4 py-3 hover:bg-emerald-50 border-b border-gray-50 last:border-0 transition-colors"
                                                                                         >
                                                                                             <div className="flex items-center gap-3">
@@ -2100,7 +2101,15 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                                                         )}
                                                                                                     </div>
                                                                                                 </div>
-                                                                                                <Plus className="w-4 h-4 text-emerald-600 flex-shrink-0 opacity-0 group-hover:opacity-100" />
+                                                                                                <span
+                                                                                                    className={`px-2 py-1 text-[10px] font-semibold rounded-full whitespace-nowrap ${item?.status === 'in_stock'
+                                                                                                        ? 'bg-emerald-50 text-emerald-700'
+                                                                                                        : 'bg-red-50 text-red-600'
+                                                                                                        }`}
+                                                                                                >
+                                                                                                    {item?.status === 'in_stock' ? 'In Stock' : 'Out of Stock'}
+                                                                                                </span>
+                                                                                                <Plus className="w-4 h-4 text-emerald-600 flex-shrink-0 opacity-0 group-hover:opacity-100" />                                                                                           <Plus className="w-4 h-4 text-emerald-600 flex-shrink-0 opacity-0 group-hover:opacity-100" />
                                                                                             </div>
                                                                                         </button>
                                                                                     ))}
@@ -3392,35 +3401,35 @@ const AppointmentDetail = ({ videodetails }) => {
 
                                                                         {/* Medical History Details */}
                                                                         {(record.history_of_past_illness || record.allergies || record.family_history || record.surgical_history) && (
-                                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                                            {record.history_of_past_illness && (
-                                                                                <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
-                                                                                    <p className="flex gap-2 text-xs font-bold text-orange-900 uppercase tracking-widest mb-2"><Notebook size={16} /> Past Illness</p>
-                                                                                    <p className="text-sm text-orange-900">{record.history_of_past_illness}</p>
-                                                                                </div>
-                                                                            )}
+                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                                {record.history_of_past_illness && (
+                                                                                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                                                                                        <p className="flex gap-2 text-xs font-bold text-orange-900 uppercase tracking-widest mb-2"><Notebook size={16} /> Past Illness</p>
+                                                                                        <p className="text-sm text-orange-900">{record.history_of_past_illness}</p>
+                                                                                    </div>
+                                                                                )}
 
-                                                                            {record.allergies && (
-                                                                                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                                                                                    <p className="flex gap-2 text-xs font-bold text-red-900 uppercase tracking-widest mb-2"><FaAllergies /> Allergies</p>
-                                                                                    <p className="text-sm text-red-900">{record.allergies}</p>
-                                                                                </div>
-                                                                            )}
+                                                                                {record.allergies && (
+                                                                                    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                                                                                        <p className="flex gap-2 text-xs font-bold text-red-900 uppercase tracking-widest mb-2"><FaAllergies /> Allergies</p>
+                                                                                        <p className="text-sm text-red-900">{record.allergies}</p>
+                                                                                    </div>
+                                                                                )}
 
-                                                                            {record.family_history && (
-                                                                                <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
-                                                                                    <p className="flex gap-2 text-xs font-bold text-purple-900 uppercase tracking-widest mb-2"><MdFamilyRestroom size={14} /> Family History</p>
-                                                                                    <p className="text-sm text-purple-900">{record.family_history}</p>
-                                                                                </div>
-                                                                            )}
+                                                                                {record.family_history && (
+                                                                                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                                                                                        <p className="flex gap-2 text-xs font-bold text-purple-900 uppercase tracking-widest mb-2"><MdFamilyRestroom size={14} /> Family History</p>
+                                                                                        <p className="text-sm text-purple-900">{record.family_history}</p>
+                                                                                    </div>
+                                                                                )}
 
-                                                                            {record.surgical_history && (
-                                                                                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                                                                                    <p className="text-xs font-bold text-red-900 uppercase tracking-widest mb-2">Surgical History</p>
-                                                                                    <p className="text-sm text-red-900">{record.surgical_history}</p>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
+                                                                                {record.surgical_history && (
+                                                                                    <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                                                                                        <p className="text-xs font-bold text-red-900 uppercase tracking-widest mb-2">Surgical History</p>
+                                                                                        <p className="text-sm text-red-900">{record.surgical_history}</p>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
                                                                         )}
 
                                                                         {/* Diagnosis Section */}

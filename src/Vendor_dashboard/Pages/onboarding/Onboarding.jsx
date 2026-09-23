@@ -6,8 +6,10 @@ import {
     X, ArrowLeft, Info, Banknote, FileCheck
 } from 'lucide-react';
 import { vendorService } from '../../../services/vendorService';
+import { acceptLegalPolicies } from '../../../services/policyService';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
+import PoliciesListPopup from '../../../Doctor_dashboard/components/onboarding/policyslist';
 
 // ==================== CONSTANTS ====================
 const BUSINESS_TYPES = [
@@ -59,7 +61,8 @@ const VALIDATION_PATTERNS = {
     gst: /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
     pan: /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/,
     fssai: /^\d{14}$/,
-    ayush: /^[A-Z0-9\/-]{6,30}$/i
+    ayush: /^[A-Z0-9\/-]{6,30}$/i,
+    website: /^(https?:\/\/)?([\w-]+(\.[\w-]+)+)(\/[\w-]*)*\/?$/i
 };
 
 const STEPS = [1, 2, 3, 4, 5];
@@ -91,6 +94,7 @@ const INITIAL_FORM_STATE = {
     },
     agreements: {
         termsAccepted: false, privacyAccepted: false, vendorAgreementAccepted: false,
+        allPoliciesAccepted: false,
         signature: '', agreeDate: new Date().toISOString().split('T')[0]
     }
 };
@@ -150,9 +154,6 @@ const transformToApiFormat = (formData) => ({
         payment_terms: formData.bankInfo.paymentTerms.replace('net', '')
     },
     agreement: {
-        terms_n_service: formData.agreements.termsAccepted,
-        privacy_policy: formData.agreements.privacyAccepted,
-        agreement_n_code_of_conduct: formData.agreements.vendorAgreementAccepted,
         digital_signature: formData.agreements.signature || null,
         date: formData.agreements.agreeDate
     }
@@ -376,6 +377,7 @@ const VendorOnboarding = () => {
     const fileInputRefs = useRef({});
     const [errors, setErrors] = useState({});
     const [formData, setFormData] = useState(INITIAL_FORM_STATE);
+    const [policiesOpen, setPoliciesOpen] = useState(false);
 
     // ==================== HANDLER FUNCTIONS ====================
     const handleInputChange = useCallback((section, field, value) => {
@@ -482,6 +484,9 @@ const VendorOnboarding = () => {
 
                 if (!formData.businessInfo.ayushLicenseNumber?.trim()) newErrors.ayushLicenseNumber = "AYUSH license number is required";
                 else if (!VALIDATION_PATTERNS.ayush.test(formData.businessInfo.ayushLicenseNumber)) newErrors.ayushLicenseNumber = "Invalid AYUSH license number format";
+                
+                if (!formData.businessInfo.website?.trim() || !VALIDATION_PATTERNS.website.test(formData.businessInfo.website)) newErrors.website = "website formate is not valid";
+                
                 break;
 
             case 2:
@@ -515,9 +520,9 @@ const VendorOnboarding = () => {
                 break;
 
             case 5:
-                if (!formData.agreements.termsAccepted) newErrors.termsAccepted = "Accept terms & conditions";
-                if (!formData.agreements.privacyAccepted) newErrors.privacyAccepted = "Accept privacy policy";
-                if (!formData.agreements.vendorAgreementAccepted) newErrors.vendorAgreementAccepted = "Accept vendor agreement";
+                if (!formData.agreements.allPoliciesAccepted) {
+                    newErrors.allPoliciesAccepted = "Please review and accept all policies";
+                }
                 break;
 
             default: break;
@@ -548,6 +553,21 @@ const VendorOnboarding = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }, []);
 
+    const handlePoliciesAcceptChange = useCallback((accepted) => {
+        setFormData((prev) => ({
+            ...prev,
+            agreements: {
+                ...prev.agreements,
+                allPoliciesAccepted: accepted,
+                termsAccepted: accepted,
+                privacyAccepted: accepted,
+            },
+        }));
+        if (accepted) {
+            setErrors((prev) => ({ ...prev, allPoliciesAccepted: "" }));
+        }
+    }, []);
+
     // ==================== SUBMIT ====================
     const handleSubmit = useCallback(async (e) => {
         e.preventDefault();
@@ -556,31 +576,46 @@ const VendorOnboarding = () => {
             setErrors(finalErrors);
             return;
         }
-        if (!formData.agreements.termsAccepted || !formData.agreements.privacyAccepted || !formData.agreements?.vendorAgreementAccepted) {
+        if (!formData.agreements.allPoliciesAccepted) {
+            setErrors((prev) => ({
+                ...prev,
+                allPoliciesAccepted: "Please review and accept all policies",
+            }));
             return;
         }
 
-        const res = await vendorService?.createOnboarding(transformToApiFormat(formData));
-        if (res?.data?.success) {
-            setIsSubmitting(true);
-            let getprofile = JSON?.parse(sessionStorage?.getItem("profile"));
-            let localdata = {
-                ...getprofile,
-                "first_name": formData?.businessInfo?.businessName,
-                "business_name": formData?.businessInfo?.businessName,
-                "email": formData?.businessInfo.businessEmail,
-                "verify": false
-            };
-            sessionStorage.setItem("profile", JSON.stringify(localdata));
-            toast.success("All steps completed successfully 🎉");
-            setTimeout(() => {
-                setIsSubmitting(false);
+        setIsSubmitting(true);
+        try {
+            const res = await vendorService?.createOnboarding(transformToApiFormat(formData));
+            if (res?.data?.success) {
+                try {
+                    await acceptLegalPolicies("all");
+                } catch (policyError) {
+                    console.error(policyError);
+                    toast.error(policyError?.message || "Profile saved, but policy acceptance failed");
+                }
+
+                let getprofile = JSON?.parse(sessionStorage?.getItem("profile"));
+                let localdata = {
+                    ...getprofile,
+                    "first_name": formData?.businessInfo?.businessName,
+                    "business_name": formData?.businessInfo?.businessName,
+                    "email": formData?.businessInfo.businessEmail,
+                    "verify": false
+                };
+                sessionStorage.setItem("profile", JSON.stringify(localdata));
+                toast.success("All steps completed successfully 🎉");
                 setShowSuccess(true);
                 setTimeout(() => {
-                    setShowSuccess(false)
-                    window.location.replace("/vendor/profile")
+                    setShowSuccess(false);
+                    window.location.replace("/vendor/profile");
                 }, 4000);
-            }, 2000);
+            }
+        } catch (error) {
+            console.error(error);
+            toast.error(error?.response?.data?.message || "Submission failed, Retry");
+        } finally {
+            setIsSubmitting(false);
         }
     }, [formData, validateStep]);
 
@@ -821,59 +856,38 @@ const VendorOnboarding = () => {
                             {/* Step 5: Agreement */}
                             {currentStep === 5 && (
                                 <div className="space-y-6">
-                                    <SectionHeader icon={Shield} title="Terms & Agreement" description="Review and accept the terms" />
+                                    <SectionHeader icon={Shield} title="Terms of Service & Privacy Policy" description="Review and accept the terms" />
 
-                                    <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-xl p-6">
-                                        <div className="flex items-center space-x-3 mb-4">
-                                            <Gift size={24} className="text-yellow-600" />
-                                            <h3 className="font-bold text-gray-800">Why partner with AyurMuni?</h3>
+                                    <div className="rounded-2xl border border-gray-200 bg-gray-50/80 p-5">
+                                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-800">
+                                                    Legal policies
+                                                </p>
+                                                <p className="mt-1 text-sm text-gray-500">
+                                                    Open the list, read each policy by name, then accept all.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPoliciesOpen(true)}
+                                                className="inline-flex items-center justify-center rounded-lg bg-[#0D614E] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#0a4f3f]"
+                                            >
+                                                {formData.agreements.allPoliciesAccepted
+                                                    ? "View policies"
+                                                    : "Review & accept policies"}
+                                            </button>
                                         </div>
-                                        <ul className="space-y-2 text-sm text-gray-700">
-                                            <li className="flex items-center space-x-2"><CheckCircle size={16} className="text-emerald-600" /><span>Reach 1M+ health-conscious customers</span></li>
-                                            <li className="flex items-center space-x-2"><CheckCircle size={16} className="text-emerald-600" /><span>Dedicated vendor support team</span></li>
-                                            <li className="flex items-center space-x-2"><CheckCircle size={16} className="text-emerald-600" /><span>Fast and secure payment settlements</span></li>
-                                            <li className="flex items-center space-x-2"><CheckCircle size={16} className="text-emerald-600" /><span>Marketing and visibility boost</span></li>
-                                        </ul>
-                                    </div>
 
-                                    <div className="bg-gray-50 rounded-xl p-6 h-48 overflow-y-auto">
-                                        <h3 className="font-bold text-gray-800 mb-4">Vendor Agreement</h3>
-                                        <div className="space-y-3 text-sm text-gray-600">
-                                            <p>1. Vendor agrees to provide authentic and high-quality products as per Ayurvedic standards.</p>
-                                            <p>2. All products must comply with applicable laws and regulations.</p>
-                                            <p>3. Vendor is responsible for timely order fulfillment and shipping.</p>
-                                            <p>4. Quality checks may be conducted by AyurMuni team.</p>
-                                            <p>5. Payment terms will be as per the agreed settlement schedule.</p>
-                                            <p>6. Vendor must maintain product inventory and pricing updates.</p>
-                                            <p>7. Any violation of terms may lead to account suspension.</p>
-                                            <p>8. Commission rates and fees will be communicated separately.</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <label className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer">
-                                            <input type="checkbox" checked={formData.agreements.termsAccepted}
-                                                onChange={(e) => handleInputChange('agreements', 'termsAccepted', e.target.checked)}
-                                                className="mt-1 w-5 h-5 rounded border-gray-300 text-[#0D614E] focus:ring-[#0D614E]" />
-                                            <span className="text-gray-700">I have read and agree to the Terms of Service</span>
-                                        </label>
-                                        {errors.termsAccepted && <FormError message={errors.termsAccepted} />}
-
-                                        <label className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer">
-                                            <input type="checkbox" checked={formData.agreements.privacyAccepted}
-                                                onChange={(e) => handleInputChange('agreements', 'privacyAccepted', e.target.checked)}
-                                                className="mt-1 w-5 h-5 rounded border-gray-300 text-[#0D614E] focus:ring-[#0D614E]" />
-                                            <span className="text-gray-700">I have read and agree to the Privacy Policy</span>
-                                        </label>
-                                        {errors.privacyAccepted && <FormError message={errors.privacyAccepted} />}
-
-                                        <label className="flex items-start space-x-3 p-3 hover:bg-gray-50 rounded-xl transition-colors cursor-pointer">
-                                            <input type="checkbox" checked={formData.agreements.vendorAgreementAccepted}
-                                                onChange={(e) => handleInputChange('agreements', 'vendorAgreementAccepted', e.target.checked)}
-                                                className="mt-1 w-5 h-5 rounded border-gray-300 text-[#0D614E] focus:ring-[#0D614E]" />
-                                            <span className="text-gray-700">I agree to the Vendor Agreement and Code of Conduct</span>
-                                        </label>
-                                        {errors.vendorAgreementAccepted && <FormError message={errors.vendorAgreementAccepted} />}
+                                        {formData.agreements.allPoliciesAccepted ? (
+                                            <p className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-emerald-700">
+                                                <CheckCircle size={16} />
+                                                All policies accepted
+                                            </p>
+                                        ) : null}
+                                        {errors.allPoliciesAccepted && (
+                                            <FormError message={errors.allPoliciesAccepted} />
+                                        )}
                                     </div>
 
                                     <div className="border-t border-gray-200 pt-6">
@@ -886,6 +900,13 @@ const VendorOnboarding = () => {
                                             </div>
                                         </div>
                                     </div>
+
+                                    <PoliciesListPopup
+                                        open={policiesOpen}
+                                        onClose={() => setPoliciesOpen(false)}
+                                        accepted={formData.agreements.allPoliciesAccepted}
+                                        onAcceptChange={handlePoliciesAcceptChange}
+                                    />
                                 </div>
                             )}
                         </div>
@@ -905,7 +926,7 @@ const VendorOnboarding = () => {
                                     <span>Continue</span><ChevronRight size={18} />
                                 </button>
                             ) : (
-                                <button type="submit" disabled={isSubmitting}
+                                <button type="submit" disabled={isSubmitting || !formData.agreements.allPoliciesAccepted}
                                     className="flex items-center space-x-2 px-8 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-all disabled:opacity-50">
                                     {isSubmitting ? (
                                         <><RefreshCw size={18} className="animate-spin" /><span>Submitting...</span></>

@@ -16,13 +16,16 @@ const VideoPip = ({ videoRef, isCameraOff, isMuted, onDragEnd }) => {
         dragMomentum={false}
         onDragEnd={onDragEnd}
         style={{ x, y }}
-        className="absolute bottom-20 right-4 w-36 md:w-48 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 bg-gray-800 pointer-events-auto cursor-move z-30"
+        className="absolute bottom-20 right-4 w-36 md:w-44 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 bg-black pointer-events-auto cursor-move z-30"
         whileDrag={{ scale: 1.02 }}
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
-        <div ref={videoRef} className="w-full aspect-video bg-gray-800 [&_video]:object-cover [&_video]:w-full [&_video]:h-full" />
+        <div
+          ref={videoRef}
+          className="video-pip w-full aspect-[4/3] bg-black [&_video]:object-contain [&_video]:w-full [&_video]:h-full"
+        />
         
         {isCameraOff && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800/90">

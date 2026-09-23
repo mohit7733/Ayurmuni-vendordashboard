@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import axios from 'axios';
 import { vendorService } from '../../../services/vendorService';
 import toast from 'react-hot-toast';
@@ -66,13 +66,6 @@ const mealMeta = {
 const mealTypes = ['morning', 'breakfast', 'midday', 'lunch', 'dinner'];
 const SEASON_OPTIONS = ['summer', 'winter', 'spring', 'autumn', 'monsoon', 'all_seasons'];
 
-const emptyDietItem = () => ({
-    name: '',
-    quantity: '',
-    recipe: [''],
-    notes: '',
-});
-
 const emptyNutrition = () => ({
     total_calories: { value: '', unit: 'kcal' },
     carbs: { value: '', unit: 'g' },
@@ -80,11 +73,18 @@ const emptyNutrition = () => ({
     fat: { value: '', unit: 'g' },
 });
 
-const emptyMeal = () => ({
-    diet: [emptyDietItem()],
+const emptyDietItem = () => ({
+    name: '',
+    quantity: '',
+    notes: '',
+    recipe: [''],
     diet_gallery: [],
     preparation_steps: [''],
     nutrition: emptyNutrition(),
+});
+
+const emptyMeal = () => ({
+    diet: [emptyDietItem()],
 });
 
 const emptyGuidance = () => [''];
@@ -97,21 +97,60 @@ const toStringArray = (value, fallback = ['']) => {
     return fallback;
 };
 
+const hasFilledNutrition = (nutrition) => {
+    const src = nutrition || {};
+    return ['total_calories', 'carbs', 'protein', 'fat'].some((key) => {
+        const value = src[key]?.value;
+        return value !== '' && value != null && String(value).trim() !== '';
+    });
+};
+
 const normalizeDietItem = (item) => {
     if (item && typeof item === 'object' && !Array.isArray(item)) {
         const recipes = toStringArray(item.recipe, ['']);
         return {
             name: item.name || '',
             quantity: item.quantity || '',
-            recipe: recipes.length ? recipes : [''],
             notes: item.notes || '',
+            recipe: recipes.length ? recipes : [''],
+            diet_gallery: Array.isArray(item.diet_gallery)
+                ? item.diet_gallery.map(normalizeMealGalleryItem).filter((img) => img.image_url)
+                : [],
+            preparation_steps: toStringArray(item.preparation_steps, ['']),
+            nutrition: normalizeNutrition(item.nutrition),
         };
     }
     return {
         name: typeof item === 'string' ? item : '',
         quantity: '',
-        recipe: [''],
         notes: '',
+        recipe: [''],
+        diet_gallery: [],
+        preparation_steps: [''],
+        nutrition: emptyNutrition(),
+    };
+};
+
+const cloneNutrition = (nutrition) => {
+    const src = normalizeNutrition(nutrition);
+    return {
+        total_calories: { ...src.total_calories },
+        carbs: { ...src.carbs },
+        protein: { ...src.protein },
+        fat: { ...src.fat },
+    };
+};
+
+const cloneDietItem = (item) => {
+    const src = normalizeDietItem(item);
+    return {
+        name: src.name,
+        quantity: src.quantity,
+        notes: src.notes,
+        recipe: [...(src.recipe || [''])],
+        diet_gallery: (src.diet_gallery || []).map((img) => ({ ...img })),
+        preparation_steps: [...(src.preparation_steps || [''])],
+        nutrition: cloneNutrition(src.nutrition),
     };
 };
 
@@ -139,14 +178,29 @@ const normalizeMeal = (meal) => {
     const diet = Array.isArray(src.diet) && src.diet.length
         ? src.diet.map(normalizeDietItem)
         : [emptyDietItem()];
-    return {
-        diet,
-        diet_gallery: Array.isArray(src.diet_gallery)
-            ? src.diet_gallery.map(normalizeMealGalleryItem).filter((img) => img.image_url)
-            : [],
-        preparation_steps: toStringArray(src.preparation_steps, ['']),
-        nutrition: normalizeNutrition(src.nutrition),
-    };
+
+    const mealGallery = Array.isArray(src.diet_gallery)
+        ? src.diet_gallery.map(normalizeMealGalleryItem).filter((img) => img.image_url)
+        : [];
+    const mealPrep = toStringArray(src.preparation_steps, ['']);
+    const mealNutrition = normalizeNutrition(src.nutrition);
+    const first = diet[0];
+
+    // Older plans store gallery/steps/nutrition on the meal. Move them onto item 1
+    // unless that item already has its own values.
+    if (first) {
+        if (!first.diet_gallery.length && mealGallery.length) {
+            first.diet_gallery = mealGallery;
+        }
+        if (!first.preparation_steps.some((step) => String(step).trim()) && mealPrep.some((step) => String(step).trim())) {
+            first.preparation_steps = mealPrep;
+        }
+        if (!hasFilledNutrition(first.nutrition) && hasFilledNutrition(mealNutrition)) {
+            first.nutrition = mealNutrition;
+        }
+    }
+
+    return { diet };
 };
 
 const initializeSchedule = (days) => {
@@ -214,21 +268,49 @@ const nutrientNumber = (value) => {
     return Number.isFinite(n) ? n : 0;
 };
 
+const serializeNutrition = (nutrition) => {
+    const src = normalizeNutrition(nutrition);
+    return {
+        total_calories: {
+            value: nutrientNumber(src.total_calories?.value),
+            unit: src.total_calories?.unit || 'kcal',
+        },
+        carbs: {
+            value: nutrientNumber(src.carbs?.value),
+            unit: src.carbs?.unit || 'g',
+        },
+        protein: {
+            value: nutrientNumber(src.protein?.value),
+            unit: src.protein?.unit || 'g',
+        },
+        fat: {
+            value: nutrientNumber(src.fat?.value),
+            unit: src.fat?.unit || 'g',
+        },
+    };
+};
+
+const sumNutrition = (items) => {
+    const acc = {
+        total_calories: { value: 0, unit: 'kcal' },
+        carbs: { value: 0, unit: 'g' },
+        protein: { value: 0, unit: 'g' },
+        fat: { value: 0, unit: 'g' },
+    };
+    (items || []).forEach((item) => {
+        const nutrition = serializeNutrition(item?.nutrition);
+        ['total_calories', 'carbs', 'protein', 'fat'].forEach((key) => {
+            acc[key].value += nutrition[key].value;
+            acc[key].unit = nutrition[key].unit || acc[key].unit;
+        });
+    });
+    return acc;
+};
+
 const cloneMeal = (meal) => {
     const src = meal || emptyMeal();
     return {
-        diet: (src.diet || []).map((item) => ({
-            ...normalizeDietItem(item),
-            recipe: [...toStringArray(item?.recipe, [''])],
-        })),
-        diet_gallery: (src.diet_gallery || []).map((img) => ({ ...img })),
-        preparation_steps: [...(src.preparation_steps || [''])],
-        nutrition: {
-            total_calories: { ...(src.nutrition?.total_calories || { value: '', unit: 'kcal' }) },
-            carbs: { ...(src.nutrition?.carbs || { value: '', unit: 'g' }) },
-            protein: { ...(src.nutrition?.protein || { value: '', unit: 'g' }) },
-            fat: { ...(src.nutrition?.fat || { value: '', unit: 'g' }) },
-        },
+        diet: (src.diet && src.diet.length ? src.diet : [emptyDietItem()]).map(cloneDietItem),
     };
 };
 
@@ -302,14 +384,19 @@ const DietPlanManager = () => {
             toast.error(error?.message || "Failed to fetch diet plan data");
         }
     };
-
+    const normalizeDiseases = (payload) => {
+        const list = payload?.data?.data || payload?.data || payload?.diseases?.data || payload?.diseases || payload;
+        return Array.isArray(list) ? list : [];
+    };
     const fetchdatabrandcat = async () => {
         try {
             // const data = await doctorService.getdiet();
-            const [diseasescat] = await Promise.all([
-                vendorService.getbrandandcategory("health-diseases"),
+            const [diseasescat] = await Promise.allSettled([
+                doctorService.getPrakritiAndDiseases()
+                // vendorService.getbrandandcategory("health-diseases"),
             ]);
-            const diseasescate = diseasescat?.data?.data || diseasescat?.data || [];
+            const diseasescate = diseasescat.status === "fulfilled" ? normalizeDiseases(diseasescat.value) : [];
+
             setDiseasesCategories(diseasescate);
         } catch (error) {
             console.error("Error fetching data:", error);
@@ -336,25 +423,36 @@ const DietPlanManager = () => {
         }));
     };
 
-    // Handle disease selection
-    const handleDiseaseChange = (e) => {
-        const selectedDiseaseId = e.target.value;
-        const selectedDisease = diseasesCategories.find(cat => cat.id === selectedDiseaseId);
+    const selectedDiseaseIds = useMemo(
+        () => new Set((formData.health_diseases || []).map((d) => String(d.id))),
+        [formData.health_diseases]
+    );
 
-        if (selectedDisease) {
-            setFormData(prev => ({
-                ...prev,
-                health_diseases: [{
-                    id: selectedDisease.id,
-                    name: selectedDisease.name
-                }]
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                health_diseases: []
-            }));
-        }
+    const availableDiseases = useMemo(
+        () => diseasesCategories.filter((category) => !selectedDiseaseIds.has(String(category.id))),
+        [diseasesCategories, selectedDiseaseIds]
+    );
+
+    const addDisease = (disease) => {
+        if (!disease || selectedDiseaseIds.has(String(disease.id))) return;
+        setFormData((prev) => ({
+            ...prev,
+            health_diseases: [...(prev.health_diseases || []), { id: disease.id, name: disease.name }],
+        }));
+    };
+
+    const removeDisease = (index) => {
+        setFormData((prev) => ({
+            ...prev,
+            health_diseases: prev.health_diseases.filter((_, i) => i !== index),
+        }));
+    };
+
+    const handleDiseaseChange = (e) => {
+        const selectedDisease = diseasesCategories.find(
+            (cat) => String(cat.id) === String(e.target.value)
+        );
+        if (selectedDisease) addDisease(selectedDisease);
     };
 
     // Upload images to S3
@@ -497,85 +595,103 @@ const DietPlanManager = () => {
         });
     };
 
-    const handleDayScheduleChange = (dayKey, mealType, field, value, subField = null, subSubField = null) => {
+    const handleDietItemChange = (dayKey, mealType, index, field, value) => {
         updateMeal(dayKey, mealType, (meal) => {
-            if (field === 'preparation_steps' && subField !== null) {
-                const next = [...meal.preparation_steps];
-                next[subField] = value;
-                meal.preparation_steps = next;
-            } else if (field === 'nutrition' && subField && subSubField !== null) {
-                meal.nutrition[subField][subSubField] = value;
-            }
+            const diet = [...meal.diet];
+            diet[index] = { ...cloneDietItem(diet[index]), [field]: value };
+            meal.diet = diet;
             return meal;
         });
     };
 
-    const handleDietItemChange = (dayKey, mealType, index, field, value) => {
+    const updateDietItem = (dayKey, mealType, dietIndex, updater) => {
         updateMeal(dayKey, mealType, (meal) => {
             const diet = [...meal.diet];
-            diet[index] = { ...normalizeDietItem(diet[index]), [field]: value };
+            diet[dietIndex] = updater(cloneDietItem(diet[dietIndex]));
             meal.diet = diet;
             return meal;
         });
     };
 
     const handleDietRecipeChange = (dayKey, mealType, dietIndex, recipeIndex, value) => {
-        updateMeal(dayKey, mealType, (meal) => {
-            const diet = [...meal.diet];
-            const item = normalizeDietItem(diet[dietIndex]);
+        updateDietItem(dayKey, mealType, dietIndex, (item) => {
             const recipe = [...(item.recipe || [''])];
             recipe[recipeIndex] = value;
-            diet[dietIndex] = { ...item, recipe };
-            meal.diet = diet;
-            return meal;
+            return { ...item, recipe };
         });
     };
 
     const addDietRecipe = (dayKey, mealType, dietIndex) => {
-        updateMeal(dayKey, mealType, (meal) => {
-            const diet = [...meal.diet];
-            const item = normalizeDietItem(diet[dietIndex]);
-            diet[dietIndex] = { ...item, recipe: [...(item.recipe || ['']), ''] };
-            meal.diet = diet;
-            return meal;
-        });
+        updateDietItem(dayKey, mealType, dietIndex, (item) => ({
+            ...item,
+            recipe: [...(item.recipe || ['']), ''],
+        }));
     };
 
     const removeDietRecipe = (dayKey, mealType, dietIndex, recipeIndex) => {
-        updateMeal(dayKey, mealType, (meal) => {
-            const diet = [...meal.diet];
-            const item = normalizeDietItem(diet[dietIndex]);
+        updateDietItem(dayKey, mealType, dietIndex, (item) => {
             const recipe = [...(item.recipe || [''])];
-            if (recipe.length <= 1) {
-                diet[dietIndex] = { ...item, recipe: [''] };
-            } else {
-                recipe.splice(recipeIndex, 1);
-                diet[dietIndex] = { ...item, recipe };
-            }
-            meal.diet = diet;
-            return meal;
+            if (recipe.length <= 1) return { ...item, recipe: [''] };
+            recipe.splice(recipeIndex, 1);
+            return { ...item, recipe };
         });
     };
 
-    const handleMealGalleryCaption = (dayKey, mealType, index, caption) => {
-        updateMeal(dayKey, mealType, (meal) => {
-            const gallery = [...(meal.diet_gallery || [])];
-            if (!gallery[index]) return meal;
+    const handleDietPrepChange = (dayKey, mealType, dietIndex, stepIndex, value) => {
+        updateDietItem(dayKey, mealType, dietIndex, (item) => {
+            const preparation_steps = [...(item.preparation_steps || [''])];
+            preparation_steps[stepIndex] = value;
+            return { ...item, preparation_steps };
+        });
+    };
+
+    const addDietPrepStep = (dayKey, mealType, dietIndex) => {
+        updateDietItem(dayKey, mealType, dietIndex, (item) => ({
+            ...item,
+            preparation_steps: [...(item.preparation_steps || ['']), ''],
+        }));
+    };
+
+    const removeDietPrepStep = (dayKey, mealType, dietIndex, stepIndex) => {
+        updateDietItem(dayKey, mealType, dietIndex, (item) => {
+            const preparation_steps = [...(item.preparation_steps || [''])];
+            if (preparation_steps.length <= 1) return { ...item, preparation_steps: [''] };
+            preparation_steps.splice(stepIndex, 1);
+            return { ...item, preparation_steps };
+        });
+    };
+
+    const handleDietNutritionChange = (dayKey, mealType, dietIndex, nutrient, value) => {
+        updateDietItem(dayKey, mealType, dietIndex, (item) => ({
+            ...item,
+            nutrition: {
+                ...cloneNutrition(item.nutrition),
+                [nutrient]: {
+                    ...(item.nutrition?.[nutrient] || { value: '', unit: nutrient === 'total_calories' ? 'kcal' : 'g' }),
+                    value,
+                },
+            },
+        }));
+    };
+
+    const handleMealGalleryCaption = (dayKey, mealType, dietIndex, index, caption) => {
+        updateDietItem(dayKey, mealType, dietIndex, (item) => {
+            const gallery = [...(item.diet_gallery || [])];
+            if (!gallery[index]) return item;
             gallery[index] = { ...gallery[index], caption };
-            meal.diet_gallery = gallery;
-            return meal;
+            return { ...item, diet_gallery: gallery };
         });
     };
 
-    const removeMealGalleryImage = (dayKey, mealType, index) => {
-        updateMeal(dayKey, mealType, (meal) => {
-            meal.diet_gallery = (meal.diet_gallery || []).filter((_, idx) => idx !== index);
-            return meal;
-        });
+    const removeMealGalleryImage = (dayKey, mealType, dietIndex, index) => {
+        updateDietItem(dayKey, mealType, dietIndex, (item) => ({
+            ...item,
+            diet_gallery: (item.diet_gallery || []).filter((_, idx) => idx !== index),
+        }));
     };
 
-    const openMealGalleryPicker = (dayKey, mealType) => {
-        const target = { dayKey, mealType };
+    const openMealGalleryPicker = (dayKey, mealType, dietIndex) => {
+        const target = { dayKey, mealType, dietIndex };
         mealUploadTargetRef.current = target;
         setMealUploadTarget(target);
         if (mealFileInputRef.current) {
@@ -586,7 +702,7 @@ const DietPlanManager = () => {
     const handleMealGalleryUpload = async (e) => {
         const files = e.target.files;
         const target = mealUploadTargetRef.current || mealUploadTarget;
-        if (!files || files.length === 0 || !target) return;
+        if (!files || files.length === 0 || !target || typeof target.dietIndex !== 'number') return;
 
         setUploadingMealImages(true);
         try {
@@ -612,10 +728,10 @@ const DietPlanManager = () => {
             }
 
             if (uploaded.length > 0) {
-                updateMeal(target.dayKey, target.mealType, (meal) => {
-                    meal.diet_gallery = [...(meal.diet_gallery || []), ...uploaded];
-                    return meal;
-                });
+                updateDietItem(target.dayKey, target.mealType, target.dietIndex, (item) => ({
+                    ...item,
+                    diet_gallery: [...(item.diet_gallery || []), ...uploaded],
+                }));
                 toast.success(`Successfully uploaded ${uploaded.length} meal image(s)`);
             }
         } catch (error) {
@@ -653,28 +769,27 @@ const DietPlanManager = () => {
         });
     };
 
-    // Add item to diet or preparation steps
+    // Add a complete diet item replica (item, quantity, notes, recipe, image, steps, nutrition)
     const addScheduleItem = (dayKey, mealType, field) => {
         updateMeal(dayKey, mealType, (meal) => {
             if (field === 'diet') {
                 meal.diet = [...(meal.diet || []), emptyDietItem()];
-            } else {
-                meal[field] = [...(meal[field] || []), ''];
             }
             return meal;
         });
     };
 
-    // Remove item from diet or preparation steps
+    // Remove item from diet
     const removeScheduleItem = (dayKey, mealType, field, index) => {
         updateMeal(dayKey, mealType, (meal) => {
-            const list = [...(meal[field] || [])];
+            if (field !== 'diet') return meal;
+            const list = [...(meal.diet || [])];
             if (list.length <= 1) {
-                meal[field] = field === 'diet' ? [emptyDietItem()] : [''];
+                meal.diet = [emptyDietItem()];
                 return meal;
             }
             list.splice(index, 1);
-            meal[field] = list;
+            meal.diet = list;
             return meal;
         });
     };
@@ -712,6 +827,10 @@ const DietPlanManager = () => {
     };
 
     const buildPayload = () => {
+        if (galleryImages.length <= 0) {
+            toast.error('Please add at least one gallery image');
+            return false;
+        }
         const validGallery = galleryImages
             .filter((img) => img.image_url && img.image_url.trim() !== '')
             .map((img) => ({
@@ -725,45 +844,32 @@ const DietPlanManager = () => {
             schedule[dayKey] = {};
             mealTypes.forEach((mealType) => {
                 const mealData = cloneMeal(formData.schedule[dayKey]?.[mealType]);
+                const dietItems = (mealData.diet || [])
+                    .map((item) => {
+                        const normalized = cloneDietItem(item);
+                        return {
+                            name: (normalized.name || '').trim(),
+                            quantity: (normalized.quantity || '').trim(),
+                            notes: (normalized.notes || '').trim(),
+                            recipe: (normalized.recipe || []).map((url) => (url || '').trim()).filter(Boolean),
+                            diet_gallery: (normalized.diet_gallery || [])
+                                .filter((img) => img.image_url)
+                                .map((img) => ({
+                                    image_url: img.image_url,
+                                    caption: img.caption || '',
+                                })),
+                            preparation_steps: (normalized.preparation_steps || [])
+                                .map((step) => (step || '').trim())
+                                .filter(Boolean),
+                            nutrition: serializeNutrition(normalized.nutrition),
+                        };
+                    })
+                    .filter((item) => item.name);
                 schedule[dayKey][mealType] = {
-                    diet: (mealData.diet || [])
-                        .map((item) => {
-                            const normalized = normalizeDietItem(item);
-                            return {
-                                name: (normalized.name || '').trim(),
-                                quantity: (normalized.quantity || '').trim(),
-                                recipe: (normalized.recipe || []).map((url) => (url || '').trim()).filter(Boolean),
-                                notes: (normalized.notes || '').trim(),
-                            };
-                        })
-                        .filter((item) => item.name),
-                    diet_gallery: (mealData.diet_gallery || [])
-                        .filter((img) => img.image_url)
-                        .map((img) => ({
-                            image_url: img.image_url,
-                            caption: img.caption || '',
-                        })),
-                    preparation_steps: (mealData.preparation_steps || [])
-                        .map((step) => (step || '').trim())
-                        .filter(Boolean),
-                    nutrition: {
-                        total_calories: {
-                            value: nutrientNumber(mealData.nutrition?.total_calories?.value),
-                            unit: mealData.nutrition?.total_calories?.unit || 'kcal',
-                        },
-                        carbs: {
-                            value: nutrientNumber(mealData.nutrition?.carbs?.value),
-                            unit: mealData.nutrition?.carbs?.unit || 'g',
-                        },
-                        protein: {
-                            value: nutrientNumber(mealData.nutrition?.protein?.value),
-                            unit: mealData.nutrition?.protein?.unit || 'g',
-                        },
-                        fat: {
-                            value: nutrientNumber(mealData.nutrition?.fat?.value),
-                            unit: mealData.nutrition?.fat?.unit || 'g',
-                        },
-                    },
+                    diet: dietItems,
+                    // diet_gallery: dietItems.flatMap((item) => item.diet_gallery || []),
+                    // preparation_steps: dietItems.flatMap((item) => item.preparation_steps || []),
+                    // nutrition: sumNutrition(dietItems),
                 };
             });
         });
@@ -793,6 +899,11 @@ const DietPlanManager = () => {
 
         try {
             const payload = buildPayload();
+            if (!payload.health_diseases.length) {
+                toast.error('Please add at least one health disease');
+                setLoading(false);
+                return;
+            }
             await doctorService.adddiet(payload);
             setMessage({ type: 'success', text: 'Diet plan created successfully!' });
             toast.success('Diet plan created successfully!');
@@ -816,6 +927,11 @@ const DietPlanManager = () => {
         setMessage({ type: '', text: '' });
         try {
             const payload = buildPayload();
+            if (!payload.health_diseases.length) {
+                toast.error('Please add at least one health disease');
+                setLoading(false);
+                return;
+            }
             const response = await doctorService.updatediet(dietPlanId, payload);
             setMessage({ type: 'success', text: 'Diet plan updated successfully!' });
             toast.success('Diet plan updated successfully!');
@@ -941,11 +1057,11 @@ const DietPlanManager = () => {
                             <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
                                 Diet Items
                             </label>
-                            <div className="space-y-2">
+                            <div className="space-y-3">
                                 {(mealData.diet || []).map((item, idx) => {
                                     const dietItem = normalizeDietItem(item);
                                     return (
-                                        <div key={idx} className="rounded-md border border-gray-100 p-2.5 space-y-2">
+                                        <div key={idx} className="rounded-md border border-gray-100 p-2.5 space-y-3">
                                             <div className="flex items-center gap-2">
                                                 <input
                                                     type="text"
@@ -964,20 +1080,18 @@ const DietPlanManager = () => {
                                                     </button>
                                                 )}
                                             </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={dietItem.quantity}
-                                                    onChange={(e) => handleDietItemChange(dayKey, mealType, idx, 'quantity', e.target.value)}
-                                                    placeholder="Quantity (e.g. 1 cup)"
-                                                />
-                                                <input
-                                                    type="text"
-                                                    value={dietItem.notes}
-                                                    onChange={(e) => handleDietItemChange(dayKey, mealType, idx, 'notes', e.target.value)}
-                                                    placeholder="Notes"
-                                                />
-                                            </div>
+                                            <input
+                                                type="text"
+                                                value={dietItem.quantity}
+                                                onChange={(e) => handleDietItemChange(dayKey, mealType, idx, 'quantity', e.target.value)}
+                                                placeholder="Quantity (e.g. 1 cup)"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={dietItem.notes}
+                                                onChange={(e) => handleDietItemChange(dayKey, mealType, idx, 'notes', e.target.value)}
+                                                placeholder="Notes"
+                                            />
                                             <div>
                                                 <p className="text-[11px] text-gray-400 mb-1">Recipe links</p>
                                                 <div className="space-y-1.5">
@@ -1010,6 +1124,118 @@ const DietPlanManager = () => {
                                                     <Plus size={12} /> Add recipe link
                                                 </button>
                                             </div>
+
+                                            {/* <div>
+                                                <p className="text-[11px] text-gray-400 mb-1">Meal image</p>
+                                                <div className="flex flex-wrap gap-2.5">
+                                                    {(dietItem.diet_gallery || []).map((image, index) => (
+                                                        <div key={`${image.image_url}-${index}`} className="w-24">
+                                                            <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50 group">
+                                                                <img
+                                                                    src={image.image_url}
+                                                                    alt={image.caption || `Meal ${index + 1}`}
+                                                                    className="w-full h-full object-cover"
+                                                                    onError={(e) => {
+                                                                        e.target.onerror = null;
+                                                                        e.target.src = 'https://via.placeholder.com/200x200?text=No+Image';
+                                                                    }}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeMealGalleryImage(dayKey, mealType, idx, index)}
+                                                                    className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/55 hover:bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                    title="Remove image"
+                                                                >
+                                                                    <X size={9} />
+                                                                </button>
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                value={image.caption || ''}
+                                                                onChange={(e) => handleMealGalleryCaption(dayKey, mealType, idx, index, e.target.value)}
+                                                                placeholder="Caption"
+                                                                className="mt-1"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openMealGalleryPicker(dayKey, mealType, idx)}
+                                                        disabled={uploadingMealImages}
+                                                        className="w-24 aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-[#0D614E] hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                                                    >
+                                                        {uploadingMealImages && mealUploadTarget?.dayKey === dayKey && mealUploadTarget?.mealType === mealType && mealUploadTarget?.dietIndex === idx ? (
+                                                            <Loader2 className="w-4 h-4 text-[#0D614E] animate-spin" />
+                                                        ) : (
+                                                            <>
+                                                                <Plus className="w-4 h-4 text-gray-400" />
+                                                                <span className="text-[9px] font-medium text-gray-600">Upload</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div> */}
+
+                                            <div>
+                                                <p className="text-[11px] text-gray-400 mb-1">Preparation steps</p>
+                                                <div className="space-y-2">
+                                                    {(dietItem.preparation_steps || ['']).map((step, stepIdx) => (
+                                                        <div key={stepIdx} className="flex items-center gap-2">
+                                                            <span className="shrink-0 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold flex items-center justify-center">
+                                                                {stepIdx + 1}
+                                                            </span>
+                                                            <input
+                                                                type="text"
+                                                                value={step}
+                                                                onChange={(e) => handleDietPrepChange(dayKey, mealType, idx, stepIdx, e.target.value)}
+                                                                placeholder={`Step ${stepIdx + 1}`}
+                                                            />
+                                                            {(dietItem.preparation_steps || []).length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => removeDietPrepStep(dayKey, mealType, idx, stepIdx)}
+                                                                    className="shrink-0 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                                                                    title="Remove step"
+                                                                >
+                                                                    <X size={14} />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addDietPrepStep(dayKey, mealType, idx)}
+                                                    className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-[#0D614E] hover:text-[#0A4D3D]"
+                                                >
+                                                    <Plus size={12} /> Add step
+                                                </button>
+                                            </div>
+
+                                            <div>
+                                                <p className="text-[11px] text-gray-400 mb-1">Nutrition</p>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                                                    {['total_calories', 'carbs', 'protein', 'fat'].map((nutrient) => (
+                                                        <div key={nutrient}>
+                                                            <label className="block text-xs text-gray-500 mb-1 capitalize">
+                                                                {nutrient.replace('_', ' ')}
+                                                            </label>
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    value={dietItem.nutrition?.[nutrient]?.value ?? ''}
+                                                                    onChange={(e) => handleDietNutritionChange(dayKey, mealType, idx, nutrient, e.target.value)}
+                                                                    placeholder="0"
+                                                                />
+                                                                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">
+                                                                    {dietItem.nutrition?.[nutrient]?.unit}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -1021,127 +1247,6 @@ const DietPlanManager = () => {
                             >
                                 <Plus size={14} /> Add item
                             </button>
-                        </div>
-
-                        {/* Meal gallery */}
-                        <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                                Meal Images
-                            </label>
-                            <div className="flex flex-wrap gap-2.5">
-                                {(mealData.diet_gallery || []).map((image, index) => (
-                                    <div key={`${image.image_url}-${index}`} className="w-24">
-                                        <div className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-50 group">
-                                            <img
-                                                src={image.image_url}
-                                                alt={image.caption || `Meal ${index + 1}`}
-                                                className="w-full h-full object-cover"
-                                                onError={(e) => {
-                                                    e.target.onerror = null;
-                                                    e.target.src = 'https://via.placeholder.com/200x200?text=No+Image';
-                                                }}
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeMealGalleryImage(dayKey, mealType, index)}
-                                                className="absolute top-1 right-1 w-4 h-4 rounded-full bg-black/55 hover:bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                                title="Remove image"
-                                            >
-                                                <X size={9} />
-                                            </button>
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={image.caption || ''}
-                                            onChange={(e) => handleMealGalleryCaption(dayKey, mealType, index, e.target.value)}
-                                            placeholder="Caption"
-                                            className="mt-1"
-                                        />
-                                    </div>
-                                ))}
-                                <button
-                                    type="button"
-                                    onClick={() => openMealGalleryPicker(dayKey, mealType)}
-                                    disabled={uploadingMealImages}
-                                    className="w-24 aspect-square rounded-lg border-2 border-dashed border-gray-300 hover:border-[#0D614E] hover:bg-gray-50 transition-colors flex flex-col items-center justify-center gap-1 disabled:opacity-50"
-                                >
-                                    {uploadingMealImages && mealUploadTarget?.dayKey === dayKey && mealUploadTarget?.mealType === mealType ? (
-                                        <Loader2 className="w-4 h-4 text-[#0D614E] animate-spin" />
-                                    ) : (
-                                        <>
-                                            <Plus className="w-4 h-4 text-gray-400" />
-                                            <span className="text-[9px] font-medium text-gray-600">Upload</span>
-                                        </>
-                                    )}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Preparation Steps */}
-                        <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                                Preparation Steps
-                            </label>
-                            <div className="space-y-2">
-                                {(mealData.preparation_steps || []).map((step, idx) => (
-                                    <div key={idx} className="flex items-center gap-2">
-                                        <span className="shrink-0 w-5 h-5 rounded-full bg-gray-100 text-gray-500 text-[11px] font-semibold flex items-center justify-center">
-                                            {idx + 1}
-                                        </span>
-                                        <input
-                                            type="text"
-                                            value={step}
-                                            onChange={(e) => handleDayScheduleChange(dayKey, mealType, 'preparation_steps', e.target.value, idx)}
-                                            placeholder={`Step ${idx + 1}`}
-                                        />
-                                        {mealData.preparation_steps.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => removeScheduleItem(dayKey, mealType, 'preparation_steps', idx)}
-                                                className="shrink-0 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-                                                title="Remove step"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => addScheduleItem(dayKey, mealType, 'preparation_steps')}
-                                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-[#0D614E] hover:text-[#0A4D3D]"
-                            >
-                                <Plus size={14} /> Add step
-                            </button>
-                        </div>
-
-                        {/* Nutrition */}
-                        <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
-                                Nutrition
-                            </label>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
-                                {['total_calories', 'carbs', 'protein', 'fat'].map((nutrient) => (
-                                    <div key={nutrient}>
-                                        <label className="block text-xs text-gray-500 mb-1 capitalize">
-                                            {nutrient.replace('_', ' ')}
-                                        </label>
-                                        <div className="relative">
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                value={mealData.nutrition?.[nutrient]?.value ?? ''}
-                                                onChange={(e) => handleDayScheduleChange(dayKey, mealType, 'nutrition', e.target.value, nutrient, 'value')}
-                                                placeholder="0"
-                                            />
-                                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-gray-400">
-                                                {mealData.nutrition?.[nutrient]?.unit}
-                                            </span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
                         </div>
                     </div>
                 )}
@@ -1494,15 +1599,35 @@ const DietPlanManager = () => {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Health Disease <span className="text-red-500">*</span>
+                                    Health Diseases <span className="text-red-500">*</span>
                                 </label>
+                                <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+                                    {(formData.health_diseases || []).map((disease, index) => (
+                                        <span
+                                            key={disease.id || index}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
+                                        >
+                                            {disease.name}
+                                            <button
+                                                type="button"
+                                                onClick={() => removeDisease(index)}
+                                                className="hover:text-blue-900"
+                                                aria-label={`Remove ${disease.name}`}
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </span>
+                                    ))}
+                                    {(!formData.health_diseases || formData.health_diseases.length === 0) && (
+                                        <span className="text-xs text-gray-400">No diseases added yet</span>
+                                    )}
+                                </div>
                                 <select
-                                    value={formData.health_diseases[0]?.id || ''}
+                                    value=""
                                     onChange={handleDiseaseChange}
-                                    required
                                 >
-                                    <option value="">Select Health Disease</option>
-                                    {diseasesCategories.map((category) => (
+                                    <option value="">Add a health disease</option>
+                                    {availableDiseases.map((category) => (
                                         <option key={category.id} value={category.id}>
                                             {category.name}
                                         </option>

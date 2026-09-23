@@ -177,7 +177,7 @@ const useAuthAnimation = () => {
 //   );
 // };
 
-const OtpInput = ({ onVerify, onBack, mobile, loading, onResendOtp, resendLoading, otpData, setselectrole }) => {
+const OtpInput = ({ onVerify, onBack, mobile, loading, onResendOtp, resendLoading, otpData, setselectrole, activeTab }) => {
   const [otp, setOtp] = useState(["", "", "", ""]);
   const [error, setError] = useState("");
   const inputRefs = useRef([]);
@@ -265,7 +265,7 @@ const OtpInput = ({ onVerify, onBack, mobile, loading, onResendOtp, resendLoadin
       </div>
 
       {error && <span className="card__error otp-error" role="alert">{error}</span>}
-      {otpData?.data?.user_roles?.length > 0 && (
+      {otpData?.data?.user_roles?.length > 0 && activeTab === "login" && (
         <div className="role-select-wrap">
           <label className="auth-card__label">
             Are you a doctor or a vendor?
@@ -577,6 +577,7 @@ const FormCard = ({
             resendLoading={resendLoading}
             otpData={otpData}
             setselectrole={setselectrole}
+            activeTab={activeTab}
           />
         ) : activeTab === "login" ? (
           <LoginForm onSubmit={onSendOtp} loading={false} />
@@ -761,6 +762,7 @@ export default function AuthPage() {
             first_name: data?.profile?.business_name || data?.profile?.first_name || "",
             verify: data?.is_verified,
             is_dietitian: data?.is_dietitian || false,
+            policies_accepted: data?.policies_accepted || false,
           })
         );
 
