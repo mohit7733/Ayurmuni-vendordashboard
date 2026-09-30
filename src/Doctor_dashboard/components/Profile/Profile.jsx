@@ -2016,7 +2016,7 @@ const DoctorProfile = () => {
                             <Link to="/dashboard" className="flex items-center max-w-[200px] space-x-2 px-4 py-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30 transition text-white absolute top-4 right-4 hover:text-white z-10">
                                 <ChevronRight size={18} /><span>Dashboard</span>
                             </Link>
-                            <div className="absolute -bottom-14 left-8">
+                            <div className="absolute -bottom-14 left-4 sm:left-8">
                                 <div className="relative group">
                                     <div className="w-28 h-28 rounded-full border-4 border-white bg-gray-100 overflow-hidden shadow-lg">
                                         {doctorData.profile_image ? (
@@ -2045,7 +2045,7 @@ const DoctorProfile = () => {
                             </div>
                         </div>
 
-                        <div className="pt-16 pl-8 pr-8 pb-6">
+                        <div className="pt-16 pl-4 pr-4 pb-6 sm:pl-8 sm:pr-8">
                             <div className="flex flex-wrap justify-between items-start gap-4">
                                 <div>
                                     <div className="flex items-center gap-3 flex-wrap">
@@ -2062,7 +2062,7 @@ const DoctorProfile = () => {
                                 </div>
                                 {
                                     JSON.parse(sessionStorage.getItem('profile'))?.verify &&
-                                    <div className="flex gap-3">
+                                    <div className="flex flex-wrap gap-3">
                                         {!isEditing ? (
                                             <button onClick={() => {
                                                 setIsEditing(true);

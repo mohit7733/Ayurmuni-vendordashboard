@@ -39,7 +39,7 @@ export default function AddProduct() {
   const [priceType, setPriceType] = useState("TP");
   const [gst, setGst] = useState(18);
   const [varient, setVarient] = useState(false);
-  const [platformFee, setPlatformFee] = useState(10);
+  const [platformFee, setPlatformFee] = useState(0);
   const [lists, setlists] = useState({
     productcat: [],
     brand: [],

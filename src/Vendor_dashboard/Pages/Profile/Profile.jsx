@@ -771,7 +771,7 @@ const VendorProfile = () => {
                         {/* Bank Tab */}
                         {activeTab === 'bank' && (
                             <div className="space-y-6">
-                                <div className="flex justify-between items-center">
+                                <div className="flex flex-wrap justify-between items-center gap-3">
                                     <h3 className="text-lg font-semibold text-gray-800">Bank Accounts</h3>
                                     <button onClick={() => setShowBankModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#0D614E] text-white rounded-xl hover:bg-[#0D614E]/90 transition shadow-md">
                                         <Plus size={18} /><span>Add Bank Account</span>
@@ -828,8 +828,8 @@ const VendorProfile = () => {
 
             {/* Modals - Remain exactly the same */}
             {showBankModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-2xl">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-lg w-full p-4 sm:p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xl font-bold text-gray-800">Add New Bank Account</h3>
                             <button onClick={() => setShowBankModal(false)} className="p-1 hover:bg-gray-100 rounded-full transition"><X size={24} /></button>
@@ -864,8 +864,8 @@ const VendorProfile = () => {
             )}
 
             {showDocumentModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl max-w-md w-full p-6">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xl font-bold text-gray-800">Upload {selectedDocument?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</h3>
                             <button onClick={() => setShowDocumentModal(false)}><X size={24} /></button>
@@ -892,8 +892,8 @@ const VendorProfile = () => {
             )}
 
             {showDeleteModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl max-w-md w-full p-6">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-center w-12 h-12 bg-rose-100 rounded-full mx-auto mb-4"><AlertTriangle size={24} className="text-rose-600" /></div>
                         <h3 className="text-xl font-bold text-gray-800 text-center mb-2">Delete Account</h3>
                         <p className="text-gray-500 text-center mb-6">Are you sure? All your data will be permanently removed.</p>

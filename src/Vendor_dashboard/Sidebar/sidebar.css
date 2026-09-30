@@ -281,11 +281,71 @@
 }
 
 @media (max-width: 768px) {
-  .vendor-sidebar {
-    --sidebar-width: 72px;
+  .vendor-sidebar,
+  .vendor-sidebar.vendor-sidebar--collapsed {
+    --sidebar-width: min(280px, 88vw);
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(280px, 88vw);
+    min-width: 0;
+    max-width: 280px;
+    height: 100vh;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 130;
+    transform: translateX(-110%);
+    transition: transform 220ms ease;
+    pointer-events: none;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .vendor-sidebar.vendor-sidebar--open {
+    transform: translateX(0);
+    pointer-events: auto;
   }
 
   .vendor-sidebar__toggle {
     display: none;
+  }
+
+  .vendor-sidebar__logo {
+    border-right: none;
+    border-bottom: 1px solid var(--ds-brand, #0D614E);
+    min-height: 64px;
+  }
+
+  .vendor-sidebar__nav {
+    display: block;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    padding: 12px 10px 24px;
+  }
+
+  .vendor-sidebar__group {
+    flex-direction: column;
+  }
+
+  .sidebar-item {
+    width: 100%;
+    white-space: normal;
+  }
+
+  .sidebar-item__label,
+  .sidebar-item__soon,
+  .vendor-sidebar__section,
+  .vendor-sidebar__pending h3,
+  .vendor-sidebar__pending p,
+  .vendor-sidebar__pending button {
+    display: block;
+  }
+
+  .sidebar-item__label {
+    display: inline;
+  }
+
+  .vendor-sidebar:has(.vendor-sidebar__pending) {
+    overflow-y: auto;
   }
 }

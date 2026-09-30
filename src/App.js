@@ -82,6 +82,20 @@ const ComingSoonAnalytics = () => (
 const VIDEO_RND_CANCEL =
   "button, a, input, textarea, select, label, .crossicomn, .video-call-no-drag";
 
+function getVideoWindowFrame() {
+  if (typeof window === "undefined") {
+    return { x: 24, y: 16, width: 450, height: 450 };
+  }
+  const width = Math.min(450, Math.max(280, window.innerWidth - 16));
+  const height = Math.min(450, Math.max(360, window.innerHeight - 24));
+  return {
+    width,
+    height,
+    x: Math.max(8, window.innerWidth - width - 12),
+    y: Math.max(8, window.innerHeight - height - 12),
+  };
+}
+
 function isVideoControlTarget(target) {
   return Boolean(target?.closest?.(VIDEO_RND_CANCEL));
 }
@@ -144,14 +158,9 @@ function App() {
       {
         videodetails?.showCall && videodetails?.appointment && videodetails?.patient && (
           <Rnd
-            default={{
-              x: 24,
-              y: Math.max(16, window.innerHeight - 574),
-              width: 550,
-              height: 550,
-            }}
-            minWidth={360}
-            minHeight={420}
+            default={getVideoWindowFrame()}
+            minWidth={280}
+            minHeight={320}
             bounds="window"
             cancel={VIDEO_RND_CANCEL}
             enableUserSelectHack={false}
@@ -315,11 +324,11 @@ export default App;
 
 function DoctorLayout() {
   return (
-    <div style={{ display: "flex", paddingLeft: "250px" }}>
+    <div className="doctor-layout">
       <DoctorSidebar />
       <div className="main-content">
         <Header />
-        <div className="page-content mt-28">
+        <div className="page-content">
           <Suspense fallback={<LoadingFallback />}>
             <Outlet />
           </Suspense>

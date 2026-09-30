@@ -65,7 +65,7 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
                     aria-modal="true"
                     aria-labelledby="modal-title"
                 >
-                    <div className="shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-start gap-4">
+                    <div className="shrink-0 bg-white border-b border-gray-200 px-4 sm:px-6 py-4 flex justify-between items-start gap-4">
                         <div>
                             <h3 id="modal-title" className="text-lg font-semibold text-gray-900">{title}</h3>
                             {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
@@ -81,13 +81,13 @@ export default function Modal({ open, onClose, title, subtitle, children, footer
                     </div>
                     <div
                         ref={bodyRef}
-                        className="p-6 overflow-y-auto overscroll-contain min-h-0 flex-1 ds-scroll"
+                        className="p-4 sm:p-6 overflow-y-auto overscroll-contain min-h-0 flex-1 ds-scroll"
                         style={{ WebkitOverflowScrolling: "touch" }}
                     >
                         {children}
                     </div>
                     {footer && (
-                        <div className="shrink-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+                        <div className="shrink-0 bg-gray-50 border-t border-gray-200 px-4 sm:px-6 py-4 flex flex-wrap justify-end gap-3">
                             {footer}
                         </div>
                     )}

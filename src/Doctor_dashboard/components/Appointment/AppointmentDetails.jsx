@@ -211,7 +211,7 @@ const SectionCard = ({ children, className = '' }) => (
 );
 
 const SectionHeader = ({ icon: Icon, title, action, badge }) => (
-    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+    <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-6 py-4 border-b border-gray-100">
         <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-gradient-to-br from-emerald-50 to-teal-50">
                 <Icon className="w-4 h-4 text-[#0D614E]" />
@@ -1734,20 +1734,22 @@ const AppointmentDetail = ({ videodetails }) => {
                                     appointment?.status &&
                                     <StatusBadge status={appointment?.status} />
                                 } */}
-                                {
-                                    appointment?.status == "confirmed" &&
+                                
                                     <div className="grid grid-cols-2 gap-2 w-full mt-2">
                                         <Link to={`/doctor/messenger/${patient?.id}`} className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 bg-emerald-50 text-[#0D614E]">
                                             <MessageCircle className="w-3.5 h-3.5" /> Message
                                         </Link>
+                                        {
+                                    appointment?.status == "confirmed" &&
                                         <button onClick={e => {
                                             // setshowCall(!showCall)
                                             videodetails({ ...videodetails, showCall: !videodetails.showCall, patient: patient, appointment: appointment })
                                         }} className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 bg-emerald-50 text-[#0D614E]">
                                             <Video className="w-3.5 h-3.5" />Join Call
                                         </button>
-                                    </div>
                                 }
+
+                                    </div>
                             </div>
                         </SectionCard>
 
@@ -2260,7 +2262,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                     </div>
                                                                 </div>
 
-                                                                <div className="flex gap-2.5 pt-1">
+                                                                <div className="flex flex-wrap gap-2.5 pt-1">
                                                                     <button
                                                                         type="button"
                                                                         onClick={handleAddMed}
@@ -2356,7 +2358,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                                     placeholder="Optional instructions"
                                                                                 />
                                                                             </div>
-                                                                            <div className="flex gap-2">
+                                                                            <div className="flex flex-wrap gap-2">
                                                                                 <button
                                                                                     type="button"
                                                                                     onClick={() => handleUpdatePrescription(med.id, editingPrescription)}
@@ -3279,7 +3281,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                         <div className="w-full space-y-4">
                                             {/* Header Section */}
                                             <div className="mb-6">
-                                                <div className="flex items-center justify-between mb-4">
+                                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                                                     <div>
                                                         <h2 className="text-2xl font-bold text-gray-900">Medical History</h2>
                                                         <p className="text-sm text-gray-600 mt-1">{patientHistory.length} consultation{patientHistory.length !== 1 ? 's' : ''} on record</p>
@@ -3339,8 +3341,8 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                     </div>
 
                                                                     {/* Status Badges */}
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className="flex gap-2">
+                                                                    <div className="flex flex-wrap items-center gap-2">
+                                                                        <div className="flex flex-wrap gap-2">
                                                                             {/* Medicine Count Badge */}
                                                                             <span className="px-4 py-2 rounded-full text-sm font-semibold bg-blue-50 border border-blue-200 text-blue-700 flex items-center gap-2">
                                                                                 <Pill className="w-3.5 h-3.5" />
@@ -3616,7 +3618,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                         {
                                             appointment?.appointments &&
                                             <div className="mb-6 mt-12 border-t border-gray-200 pt-8">
-                                                <div className="flex items-center justify-between mb-4">
+                                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                                                     <div>
                                                         <h2 className="text-2xl font-bold text-gray-900">Appointment History</h2>
                                                         <p className="text-sm text-gray-600 mt-1">{appointment?.appointments?.length} consultation{appointment?.appointments?.length !== 1 ? 's' : ''} on record</p>
@@ -3879,20 +3881,20 @@ const AppointmentDetail = ({ videodetails }) => {
                         {showCall && (
                             <Rnd
                                 default={{
-                                    x: (0 - (window.innerWidth / 2.6)),
-                                    y: 0,
-                                    width: 500,
-                                    height: 400,
+                                    x: 12,
+                                    y: 12,
+                                    width: Math.min(500, Math.max(280, window.innerWidth - 24)),
+                                    height: Math.min(420, Math.max(320, window.innerHeight - 24)),
                                 }}
-                                minWidth={550}
-                                minHeight={550}
+                                minWidth={280}
+                                minHeight={320}
                                 bounds="window"
                                 style={{
                                     zIndex: 9999999,
                                     position: "fixed",
                                 }}
                             >
-                                <div className=" fixed bottom-6 left-6 w-[550px] h-[550px] rounded-3xl overflow-hidden shadow-2xl bg-black" style={{ zIndex: "99999999999" }}>
+                                <div className="relative w-full h-full rounded-3xl overflow-hidden shadow-2xl bg-black">
                                     <DoctorVideoCall consultationId={appointment?.id} patientDetails={patient} />
                                     <span className='crossicomn' onClick={e => setshowCall(!showCall)}>
                                         <X size={16} />
@@ -3906,8 +3908,8 @@ const AppointmentDetail = ({ videodetails }) => {
 
             {showUploadModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                        <div className="px-4 sm:px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
                             <div>
                                 <h3 className="text-lg font-bold text-gray-900">Upload Medical Record</h3>
                                 <p className="text-xs text-gray-500 mt-0.5">
@@ -3963,7 +3965,7 @@ const AppointmentDetail = ({ videodetails }) => {
                             </div>
                         </div>
 
-                        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3">
+                        <div className="px-4 sm:px-6 py-4 border-t border-gray-100 flex flex-wrap items-center justify-end gap-3">
                             <button
                                 type="button"
                                 onClick={resetUploadForm}
@@ -3996,11 +3998,11 @@ const AppointmentDetail = ({ videodetails }) => {
                         {/* ─────────────────────────────────────────────────────────────────────────────── */}
                         {/* PREMIUM HEADER */}
                         {/* ─────────────────────────────────────────────────────────────────────────────── */}
-                        <div className="sticky top-0 z-20 bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-800 border-b-4 border-emerald-600 px-6 py-5">
-                            <div className="flex items-center justify-between">
+                        <div className="sticky top-0 z-20 bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-800 border-b-4 border-emerald-600 px-4 sm:px-6 py-4 sm:py-5">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
 
                                 {/* Left Section - Title */}
-                                <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-3 min-w-0">
                                     <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
                                         <FileText className="w-6 h-6 text-white" />
                                     </div>
@@ -4075,7 +4077,7 @@ const AppointmentDetail = ({ videodetails }) => {
                         {/* ─────────────────────────────────────────────────────────────────────────────── */}
                         {/* SCROLLABLE CONTENT */}
                         {/* ─────────────────────────────────────────────────────────────────────────────── */}
-                        <div className="overflow-y-auto flex-1 bg-gradient-to-b from-gray-50 via-white to-gray-50 p-6">
+                        <div className="overflow-y-auto flex-1 bg-gradient-to-b from-gray-50 via-white to-gray-50 p-4 sm:p-6">
                             {/* White Container for Prescription */}
                             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                                 <PrescriptionTemplate
@@ -4093,7 +4095,7 @@ const AppointmentDetail = ({ videodetails }) => {
                         {/* ─────────────────────────────────────────────────────────────────────────────── */}
                         {/* FOOTER */}
                         {/* ─────────────────────────────────────────────────────────────────────────────── */}
-                        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-between items-center">
+                        <div className="sticky bottom-0 bg-white border-t border-gray-200 px-4 sm:px-6 py-4 flex flex-wrap justify-between items-center gap-3">
                             <p className="text-xs text-gray-500">
                                 Prescription ID: <span className="font-mono font-semibold text-gray-700">{appointment?.id?.slice(0, 8) || 'RX-000'}</span>
                             </p>

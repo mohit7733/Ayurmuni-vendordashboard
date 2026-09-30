@@ -186,7 +186,7 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
                         {count} plan{count === 1 ? '' : 's'} total
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <button
                         type="button"
                         onClick={() => fetchPlans()}
@@ -214,7 +214,7 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
 
             {/* Toolbar */}
             <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-3.5 mb-4 flex  items-center gap-2.5">
-                <div className="relative flex-1 min-w-[340px]">
+                <div className="relative flex-1 min-w-0 w-full sm:min-w-[220px]">
                     <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                         type="text"
@@ -223,7 +223,7 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
                             setSearch(e.target.value)
                         }}
                         placeholder="Search by name or condition…"
-                        className="px-8"
+                        className="w-full min-w-0 px-8"
                     />
                 </div>
 

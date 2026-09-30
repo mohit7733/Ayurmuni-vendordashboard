@@ -348,10 +348,10 @@ const DoctorDashboard = () => {
                 </div>
             )}
 
-            <main className="p-6">
+            <main className="p-4 sm:p-6">
                 {/* Welcome Banner */}
-                <div className="bg-gradient-to-r from-[#0D614E] to-[#0a4d3e] rounded-2xl p-6 mb-8 text-white">
-                    <div className="flex justify-between items-center">
+                <div className="bg-gradient-to-r from-[#0D614E] to-[#0a4d3e] rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 text-white">
+                    <div className="flex flex-wrap justify-between items-center gap-4">
                         <div>
                             <h2 className="text-2xl font-bold mb-2 text-white">Welcome back</h2>
                             <p className="text-emerald-100">You have {dashboardData.todayAppointments.length} confirmed appointments today</p>
@@ -423,8 +423,8 @@ const DoctorDashboard = () => {
                                     ) : (
                                         dashboardData.todayAppointments.map((appointment, index) => (
                                             <div key={appointment.id} className="p-4 hover:bg-gray-50 transition-colors">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center space-x-4">
+                                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                                    <div className="flex items-start gap-4 min-w-0">
                                                         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#0D614E] to-[#0a4d3e] flex items-center justify-center text-white font-semibold">
                                                             {appointment.patient?.first_name?.charAt(0)}{appointment.patient?.last_name?.charAt(0)}
                                                         </div>
@@ -506,8 +506,8 @@ const DoctorDashboard = () => {
                                     ) : (
                                         dashboardData.upcomingConsultations.map((appointment, index) => (
                                             <div key={appointment.id} className="p-4 hover:bg-gray-50 transition-colors">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center space-x-4">
+                                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                                    <div className="flex items-start gap-4 min-w-0">
                                                         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#0D614E] to-[#0a4d3e] flex items-center justify-center text-white font-semibold">
                                                             {appointment.patient?.first_name?.charAt(0)}{appointment.patient?.last_name?.charAt(0)}
                                                         </div>
@@ -883,7 +883,7 @@ const DoctorDashboard = () => {
                                                     className="w-11 h-11 rounded-full object-cover border"
                                                 />
                                                 <div className="flex-1">
-                                                    <div className="flex items-center justify-between">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
                                                         <div>
                                                             <h4 className="font-semibold text-gray-900">
                                                                 {review.reviewer_name}

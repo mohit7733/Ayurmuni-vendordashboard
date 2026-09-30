@@ -205,7 +205,7 @@ export default function OrderDetail() {
             ]}
             contentClassName="vendor-page-content order-page-content"
             actions={
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button
                         variant="secondary"
                         onClick={() => navigate("/vendor/orders")}

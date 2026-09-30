@@ -170,8 +170,8 @@ const Pagination = ({
     const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
     return (
-        <div className="flex  flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
-            <div className="flex items-center gap-3 text-sm text-gray-600">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-3 sm:px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
                 <span>
                     Showing <span className="font-medium">{startItem}</span> to <span className="font-medium">{endItem}</span> of{' '}
                     <span className="font-medium">{totalItems}</span> appointments
@@ -187,7 +187,7 @@ const Pagination = ({
                 </select>
             </div>
 
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center justify-center gap-1 max-w-full">
                 <button
                     onClick={() => onPageChange(currentPage - 1)}
                     disabled={currentPage === 1}
@@ -562,6 +562,7 @@ const AppointmentsPage = () => {
                     patient_name: apt.patient_name || 'Unknown Patient',
                     patient_prakriti: apt.prakriti,
                     day: apt.day,
+                    call_status:apt.call_status
                 }));
                 setAppointments(appointmentsData);
                 setTotalItems(response.data.data.count ?? appointmentsData.length);
@@ -762,16 +763,40 @@ const AppointmentsPage = () => {
     };
 
 
+const getCallStatus = (appointment) => {
+    if (appointment.status !== "confirmed") {
+        return null;
+    }
 
+    const startDateTime = new Date(
+        `${appointment.appointment_date}T${appointment.start_time}`
+    );
+
+    const endDateTime = new Date(
+        `${appointment.appointment_date}T${appointment.end_time}`
+    );
+
+    const now = new Date();
+
+    if (now >= startDateTime && now < endDateTime) {
+        return "live";
+    }
+
+    if (now >= endDateTime) {
+        return "ended";
+    }
+
+    return "upcoming";
+};
 
     return (
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
             <div className="border-b border-gray-200 bg-white sticky top-0 z-20">
-                <div className="px-8 py-6">
-                    <div className="flex justify-between items-center">
+                <div className="px-4 py-4 sm:px-8 sm:py-6">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-800">Appointment Management</h1>
+                            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Appointment Management</h1>
                             <p className="text-gray-500 mt-1">Manage and track all patient appointments</p>
                         </div>
                         <div className="flex items-center space-x-3">
@@ -795,7 +820,7 @@ const AppointmentsPage = () => {
             </div>
 
             {/* Main Content */}
-            <div className="p-8">
+            <div className="p-4 sm:p-8">
                 {/* Statistics Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
                     <StatCard title="Total Appointments" value={stats.total} icon={CalendarIcon} iconBg="bg-emerald-50" iconColor="text-[#0D614E]" />
@@ -807,8 +832,8 @@ const AppointmentsPage = () => {
 
                 {/* Filters and Search Bar */}
                 <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-                    <div className="flex flex-wrap gap-4 items-center justify-between">
-                        <div className="flex-1 min-w-[200px]">
+                    <div className="flex gap-4 items-center justify-between">
+                        <div className="flex-1 min-w-0 w-full sm:min-w-[200px]">
                             <div className="relative">
                                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                                 <input
@@ -823,7 +848,7 @@ const AppointmentsPage = () => {
                                 />
                             </div>
                         </div>
-                        <div className="flex  gap-3">
+                        <div className="flex  gap-3 w-full sm:w-auto">
                             <select
                                 value={statusFilter}
                                 onChange={(e) => {
@@ -1022,17 +1047,37 @@ const AppointmentsPage = () => {
                                                             {appointment.concern?.length > 40 && '...'}
                                                         </span>
                                                     </td>
+                                                    {console.log(appointment.call_status,new Date(appointment.appointment_date).getDate() < new Date()?.getDate())
+                                                    }
+
+<td className="px-6 py-4">
+    <StatusBadge status={appointment.status} />
+
+    {appointment.status === "confirmed" && getCallStatus(appointment) === "live" && (
+        <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full animate-pulse">
+            <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+            Live
+        </span>
+    )}
+
+    {appointment.status === "confirmed" && getCallStatus(appointment) === "ended" && (
+        <div className="mt-2 flex items-center gap-2">
+            <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
+                Call Ended
+            </span>
+           <Link
+                                                                to={`appointment/${appointment.id}`}
+                                                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                                                                title="View Details"
+                className="px-3 py-1 text-xs rounded-md bg-green-600 text-white hover:bg-green-700"
+            >
+                Fill Prescription
+            </Link>
+        </div>
+    )}
+</td>
                                                     <td className="px-6 py-4">
-                                                        <StatusBadge status={appointment.status} />
-                                                        {appointment.call_status === 'in_progress' && (new Date(appointment.appointment_date).getDate() > new Date()?.getDate()) && (
-                                                            <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full animate-pulse">
-                                                                <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                                                                Live
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <div className="flex items-center space-x-2">
+                                                        <div className="flex items-center gap-1 shrink-0">
                                                             <Link
                                                                 to={`appointment/${appointment.id}`}
                                                                 className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"

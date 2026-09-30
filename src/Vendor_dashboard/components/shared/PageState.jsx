@@ -102,7 +102,7 @@ export function PaginationBar({
     };
 
     return (
-        <div className="flex mt-8 flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-gray-200 bg-gray-50/80 rounded-b-xl">
+        <div className="flex mt-8 flex-col sm:flex-row items-center justify-between gap-4 px-3 sm:px-6 py-4 border-t border-gray-200 bg-gray-50/80 rounded-b-xl">
             <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
                 <span>
                     Showing <span className="font-medium text-gray-800">{start}</span>–
@@ -122,7 +122,7 @@ export function PaginationBar({
                     </select>
                 )}
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex flex-wrap items-center justify-center gap-1 max-w-full">
                 <button
                     type="button"
                     disabled={page <= 1}

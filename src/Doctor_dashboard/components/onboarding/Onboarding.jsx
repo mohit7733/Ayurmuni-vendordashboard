@@ -1104,7 +1104,7 @@ const DoctorOnboarding = () => {
                         </div>
 
                         {/* Navigation Buttons */}
-                        <div className="flex justify-between items-center px-8 py-6 bg-gray-50 border-t border-gray-200">
+                        <div className="flex flex-wrap justify-between items-center gap-3 px-4 py-4 sm:px-8 sm:py-6 bg-gray-50 border-t border-gray-200">
                             <button type="button" onClick={prevStep}
                                 className={`flex items-center space-x-2 px-6 py-2 rounded-lg transition-all ${currentStep > 1
                                     ? 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'

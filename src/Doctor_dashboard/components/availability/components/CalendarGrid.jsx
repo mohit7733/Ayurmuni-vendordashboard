@@ -7,13 +7,14 @@ const CalendarGrid = ({ days, onDateClick, onSlotClick }) => {
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
     return (
-        <div className="p-6">
+        <div className="overflow-x-auto">
+            <div className="min-w-[680px] p-3 sm:p-6">
             {/* Weekday Headers */}
-            <div className="grid grid-cols-7 gap-2 mb-4">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-4">
                 {weekDays.map(day => (
                     <div
                         key={day}
-                        className="text-center text-sm font-semibold text-gray-600 py-2"
+                        className="text-center text-xs sm:text-sm font-semibold text-gray-600 py-2"
                     >
                         {day}
                     </div>
@@ -21,7 +22,7 @@ const CalendarGrid = ({ days, onDateClick, onSlotClick }) => {
             </div>
 
             {/* Calendar Days */}
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
                 {days.map((day, idx) => (
                     <CalendarDayCard
                         key={idx}
@@ -47,6 +48,7 @@ const CalendarGrid = ({ days, onDateClick, onSlotClick }) => {
                 <LegendItem color="bg-orange-100 border border-orange-200" text="Rescheduled" />
                 <LegendItem color="bg-red-100 border border-red-200" text="Cancelled" />
                 <LegendItem color="bg-gray-100 border border-gray-200" text="Expired" />
+            </div>
             </div>
         </div>
     );

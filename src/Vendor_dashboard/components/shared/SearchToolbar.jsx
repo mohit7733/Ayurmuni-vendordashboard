@@ -36,9 +36,9 @@ export default function SearchToolbar({
         <div
             className={`ds-card p-4 sm:p-5 mb-6 transition-shadow duration-200 ${focused ? "shadow-md ring-1 ring-[#0D614E]/10" : ""} ${className}`}
         >
-            <form className="flex flex-nowrap items-center gap-3" onSubmit={handleSubmit}>
+            <form className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center" onSubmit={handleSubmit}>
                 {children}
-                <div className="relative min-w-0 flex-1">
+                <div className="relative min-w-0 flex-1 w-full">
                     <Search
                         className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                         size={18}
@@ -56,7 +56,7 @@ export default function SearchToolbar({
                     />
                 </div>
                 {!live && (
-                    <div className="flex shrink-0 items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Button type="submit" variant="primary" className="!h-10 !py-0 px-4 shrink-0">
                             {submitLabel}
                         </Button>
