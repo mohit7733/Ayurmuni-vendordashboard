@@ -7,6 +7,7 @@ import {
     Check,
     CheckCheck,
     X,
+    ChevronLeft,
     Users,
     Calendar,
     Activity,
@@ -178,7 +179,7 @@ const PatientListItem = ({ patient, isSelected, onClick }) => (
 );
 
 const PatientInfoSidebar = ({ patient, onClose }) => (
-    <div className="w-80 border-l border-gray-200 bg-gray-50 flex flex-col h-full">
+    <div className="fixed inset-0 z-50 w-full bg-gray-50 flex flex-col h-full md:static md:inset-auto md:z-auto md:w-80 md:border-l md:border-gray-200">
         <div className="p-4 border-b border-gray-200 bg-white flex items-center justify-between">
             <h3 className="font-semibold text-gray-800">Patient Info</h3>
             <button
@@ -908,8 +909,8 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
     );
 
     return (
-        <div className="flex h-[calc(84vh)] bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-            <div className="w-80 border-r border-gray-200 flex flex-col bg-gray-50">
+        <div className="flex flex-col md:flex-row h-auto md:h-[calc(84vh)] min-h-[70vh] bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+            <div className="flex w-full md:w-80 max-h-[42vh] md:max-h-none border-b md:border-b-0 md:border-r border-gray-200 flex-col bg-gray-50 min-w-0 shrink-0">
                 <div className="p-4 border-b border-gray-200 bg-white">
                     <div className="flex items-center justify-between mb-3">
                         <h2 className="text-lg font-semibold text-gray-800">Messages</h2>
@@ -969,12 +970,26 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
             </div>
 
             {selectedPatient ? (
-                <div className="flex-1 flex flex-col">
-                    <div className="px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <Avatar src={selectedPatient.avatar} name={selectedPatient.name} className="w-10 h-10" />
-                            <div>
-                                <h3 className="font-medium text-gray-800">{selectedPatient.name}</h3>
+                <div className="flex-1 flex flex-col min-w-0">
+                    <div className="px-3 sm:px-4 py-3 border-b border-gray-200 bg-white flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <button
+                                type="button"
+                                className="md:hidden p-2 -ml-1 rounded-lg hover:bg-gray-100 shrink-0"
+                                onClick={() => {
+                                    if (patientId) {
+                                        window.location.replace("/doctor/messenger");
+                                        return;
+                                    }
+                                    setSelectedPatient(null);
+                                }}
+                                aria-label="Back to conversations"
+                            >
+                                <ChevronLeft className="w-5 h-5 text-gray-600" />
+                            </button>
+                            <Avatar src={selectedPatient.avatar} name={selectedPatient.name} className="w-10 h-10 shrink-0" />
+                            <div className="min-w-0">
+                                <h3 className="font-medium text-gray-800 truncate">{selectedPatient.name}</h3>
                                 <p className="text-xs text-gray-400">
                                     {chatAccess?.active_phase
                                         ? `${chatAccess.active_phase.replace(/_/g, ' ')} chat`
@@ -1074,8 +1089,10 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
                         </div>
                     </div>
                 </div>
-            ) : (
-                renderEmptyState()
+                            ) : (
+                <div className="flex flex-1 min-w-0 min-h-[280px]">
+                    {renderEmptyState()}
+                </div>
             )}
 
             {isPatientInfoOpen && selectedPatient && (

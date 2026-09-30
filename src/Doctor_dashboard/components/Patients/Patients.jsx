@@ -225,8 +225,8 @@ const PatientManagement = () => {
 
                 {/* Header */}
                 <div className="bg-white border-b border-gray-200 sticky top-0 z-20 shadow-sm">
-                    <div className="px-8 py-6">
-                        <div className="flex justify-between items-center">
+                    <div className="px-4 py-4 sm:px-8 sm:py-6">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
                             <div>
                                 <h1 className="text-2xl font-bold text-gray-800">Patient Management</h1>
                                 <p className="text-gray-500 mt-1">View and manage all patient information</p>
@@ -236,7 +236,7 @@ const PatientManagement = () => {
                 </div>
 
                 {/* Main Content */}
-                <div className="p-8">
+                <div className="p-4 sm:p-8">
                     {/* Statistics Cards */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                         <div className="bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all border border-gray-100">
@@ -319,7 +319,7 @@ const PatientManagement = () => {
                     {/* Filters and Search */}
                     <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
                         <div className="flex flex-wrap gap-4 items-center justify-between">
-                            <div className="flex-1 min-w-[250px]">
+                            <div className="flex-1 min-w-0 w-full">
                                 <div className="relative">
                                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
                                     <input
@@ -335,7 +335,7 @@ const PatientManagement = () => {
                                 </div>
                             </div>
 
-                            <div className="flex gap-3">
+                            <div className="flex  gap-3 w-full sm:w-auto">
                                 <select
                                     value={filterPrakriti}
                                     onChange={(e) => {
@@ -501,7 +501,7 @@ const PatientManagement = () => {
 
                                 {/* Pagination */}
                                 {totalPages > 1 && (
-                                    <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between bg-gray-50">
+                                    <div className="px-3 sm:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-gray-50">
                                         <div className="text-sm text-gray-500">
                                             Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, patientsData.count)} of {patientsData.count} patients
                                         </div>

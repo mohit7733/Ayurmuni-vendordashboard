@@ -366,13 +366,13 @@ const FinanceDashboard = () => {
         <div className="min-h-screen bg-gray-50">
             {/* Header */}
             <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
-                <div className="px-8 py-6">
-                    <div className="flex justify-between items-center">
+                <div className="px-4 py-4 sm:px-8 sm:py-6">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:justify-between lg:items-center">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-800">Finance & Earnings</h1>
+                            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Finance & Earnings</h1>
                             <p className="text-gray-500 mt-1">Track revenue, payments, and financial insights</p>
                         </div>
-                        <div className="flex items-center space-x-3">
+                        <div className="flex flex-wrap items-center gap-3">
                             <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
                                 {['week', 'month', 'year'].map((range) => (
                                     <button
@@ -397,7 +397,7 @@ const FinanceDashboard = () => {
             </div>
 
             {/* Main Content */}
-            <div className="p-8">
+            <div className="p-4 sm:p-8">
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     {/* Total Revenue Card */}

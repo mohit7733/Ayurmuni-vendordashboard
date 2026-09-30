@@ -519,7 +519,7 @@ const HelpSupport = () => {
                                 placeholder="Search for help articles, guides, or ask a question..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-12 pr-4 py-3 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white"
+                                className="w-full pl-12 pr-24 py-3 rounded-xl text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white"
                             />
                             <button className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-1.5 bg-[#0D614E] text-white rounded-lg hover:bg-opacity-90">
                                 Search

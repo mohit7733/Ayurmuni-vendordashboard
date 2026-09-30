@@ -990,15 +990,37 @@
     color: #0a4f3f;
 }
 
+@media (max-width: 1024px) {
+    .auth-wrapper {
+        flex-direction: column;
+    }
+
+    .auth-banner {
+        flex: none;
+        width: 100%;
+        height: 180px;
+        min-height: 140px;
+    }
+
+    .auth-form-panel {
+        padding: 24px 16px;
+        width: 100%;
+    }
+
+    .auth-card {
+        padding: 28px 20px 24px;
+    }
+}
+
 /* Responsive OTP inputs */
 @media (max-width: 480px) {
     .otp-input {
-        width: 50px;
-        height: 50px;
-        font-size: 20px;
+        width: 42px;
+        height: 46px;
+        font-size: 18px;
     }
 
     .otp-input-container {
-        gap: 8px;
+        gap: 6px;
     }
 }

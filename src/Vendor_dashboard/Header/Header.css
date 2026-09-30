@@ -3,13 +3,20 @@
 /* ============================= */
 
 .header {
-  height: 79px;
-  margin-bottom: 20px;
+  height: auto;
+  min-height: 64px;
+  margin-bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  width: calc(100% - 240px);
+  gap: 8px;
+  padding: 8px 16px;
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #fff;
+  border-bottom: 1px solid #f3f4f6;
 }
 
 /* ============================= */
@@ -225,12 +232,25 @@
 /* ============================= */
 
 @media (max-width: 768px) {
-  .header-left {
-    display: none;
+  .header {
+    padding: 8px 12px 8px 60px;
+  }
+
+  .welcome-title {
+    font-size: 15px;
   }
 
   .profile-info {
-    display: none;
+    display: flex;
+    max-width: 110px;
+    min-width: 0;
+  }
+
+  .profile-info .name,
+  .profile-info .role {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
@@ -238,8 +258,10 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 14px;
+  padding: 6px 8px;
   border-radius: 12px;
+  min-width: 0;
+  flex: 1;
 }
 
 /* Icon */
@@ -259,9 +281,11 @@
 }
 
 .welcome-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   color: #111827;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .welcome-title span {
@@ -394,7 +418,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .vendor-header__page-actions .ds-btn,
@@ -573,11 +598,34 @@
   border-top: 1px solid #f3f4f6;
 }
 
-@media (max-width: 640px) {
-  .vendor-header__title {
-    display: none;
+@media (max-width: 768px) {
+  .vendor-header {
+    height: auto;
+    min-height: 56px;
   }
+
+  .vendor-header__inner {
+    padding: 8px 12px 8px 60px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
   .vendor-header__left {
-    display: none;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .vendor-header__breadcrumb {
+    min-width: 0;
+  }
+
+  .vendor-header__crumb--current,
+  .vendor-header__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 46vw;
   }
 }

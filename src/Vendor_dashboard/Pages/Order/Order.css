@@ -534,6 +534,11 @@
 }
 
 @media (max-width: 640px) {
+    .order-detail-hero,
+    .order-detail-section {
+        padding: 1rem;
+    }
+
     .order-detail-hero-amount {
         text-align: left;
         width: 100%;
@@ -543,5 +548,19 @@
 
     .order-address-grid {
         grid-template-columns: 1fr;
+    }
+
+    .order-detail-row {
+        flex-wrap: wrap;
+        gap: 0.25rem 1rem;
+    }
+
+    .order-detail-row dd {
+        text-align: left;
+        width: 100%;
+    }
+
+    .order-item-card {
+        gap: 0.75rem;
     }
 }

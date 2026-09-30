@@ -148,7 +148,7 @@ const Header = () => {
 
     if (!isVendor) {
         return (
-            <header className="header header--legacy fixed top-0 right-0 z-30">
+            <header className="header header--legacy">
                 <div className="welcome-box">
                     <div className="welcome-text">
                         <p className="welcome-title">
@@ -310,7 +310,7 @@ const Header = () => {
                                 </div>
                             )}
 
-                            <span className="hidden lg:block vendor-header__profile-name capitalize">
+                            <span className="vendor-header__profile-name capitalize truncate max-w-[88px] sm:max-w-[140px]">
                                 {displayName}
                             </span>
                         </button>

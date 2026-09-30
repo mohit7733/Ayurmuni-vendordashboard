@@ -833,7 +833,8 @@
 
 @media (max-width: 640px) {
     .catalog-category__count {
-        display: none;
+        font-size: 11px;
+        flex-shrink: 0;
     }
 
     .catalog-category__trigger {
@@ -842,7 +843,8 @@
     }
 
     .catalog-unassigned__hint {
-        display: none;
+        font-size: 12px;
+        white-space: normal;
     }
 
     .catalog-panel__header {

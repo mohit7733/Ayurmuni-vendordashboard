@@ -13,7 +13,7 @@ import {
   Message,
   Bowlrice,
 } from "./Icons";
-import { Clock3, ListChecks } from "lucide-react";
+import { Clock3, ListChecks, Menu, X } from "lucide-react";
 
 const AVAILABILITY_ICON = Appointment;
 
@@ -22,6 +22,7 @@ const DoctorSidebar = () => {
   const location = useLocation();
   const [itsverify, setitsverify] = useState(false);
   const [collapsed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const isdietitian = sessionStorage.getItem("profile") ? JSON.parse(sessionStorage.getItem("profile")).is_dietitian : false;
 
   const menuItems = [
@@ -71,6 +72,24 @@ const DoctorSidebar = () => {
     return () => window.removeEventListener("storage", onStorage);
   }, [location.pathname]);
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
   const isPathActive = (path) => {
     const basePath = path.split("?")[0];
     if (basePath === "/doctor/dashboard") return location.pathname === basePath;
@@ -87,7 +106,10 @@ const DoctorSidebar = () => {
         <div
           key={item.name}
           className={`menu-item ${isActive ? "active" : ""}`}
-          onClick={() => navigate(item.path)}
+          onClick={() => {
+            setMenuOpen(false);
+            navigate(item.path);
+          }}
         >
           <span className="icon">{item.icon}</span>
           {!collapsed && <span className="label">{item.name}</span>}
@@ -97,7 +119,24 @@ const DoctorSidebar = () => {
 
   return (
     <>
-      <div className={`sidebar ${collapsed ? "collapsed" : ""}`}>
+      <button
+        type="button"
+        className="nav-hamburger"
+        aria-label={menuOpen ? "Close menu" : "Open menu"}
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        {menuOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+      {menuOpen && (
+        <button
+          type="button"
+          className="nav-backdrop"
+          aria-label="Close menu"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+      <div className={`sidebar ${collapsed ? "collapsed" : ""} ${menuOpen ? "sidebar--open" : ""}`}>
         <div className="logo">
           <img src={logo} alt="Ayurmuni-logo" />
         </div>
@@ -141,7 +180,11 @@ const DoctorSidebar = () => {
 
                 <button
                   className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0D614E] px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-[#094c3d] hover:shadow-lg"
-                  onClick={() => navigate("/doctor/help-support")}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate("/doctor/help-support");
+                  }}
+                  title="Contact Support"
                 >
                   Contact Support
                 </button>

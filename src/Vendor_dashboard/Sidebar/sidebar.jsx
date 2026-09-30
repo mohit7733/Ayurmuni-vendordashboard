@@ -8,6 +8,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Menu,
+  X,
   Layers,
   Image,
   BookOpen,
@@ -72,6 +74,7 @@ const Sidebar = () => {
   const location = useLocation();
   const [itsverify, setitsverify] = useState(false);
   const [collapsed, setCollapsed] = useState(getInitialSidebarCollapsed);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     setitsverify(JSON.parse(sessionStorage.getItem("profile"))?.verify);
@@ -88,6 +91,30 @@ const Sidebar = () => {
     }
   }, [collapsed]);
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [menuOpen]);
+
+  const goTo = (path) => {
+    if (!path) return;
+    setMenuOpen(false);
+    navigate(path);
+  };
+
   const renderMenu = (items) =>
     items.map((item) => {
       const isActive = isItemActive(location, item);
@@ -98,14 +125,14 @@ const Sidebar = () => {
           key={item.name}
           type="button"
           className={`sidebar-item ${isActive ? "sidebar-item--active" : ""}`}
-          onClick={() => item.path && navigate(item.path)}
+          onClick={() => goTo(item.path)}
           title={collapsed ? item.name : undefined}
           aria-current={isActive ? "page" : undefined}
         >
           <span className="sidebar-item__icon">
             <Icon size={18} strokeWidth={isActive ? 2.25 : 2} />
           </span>
-          {!collapsed && (
+          {(!collapsed || menuOpen) && (
             <span className="sidebar-item__label">
               {item.name}
               {item.soon && <span className="sidebar-item__soon">Soon</span>}
@@ -116,9 +143,27 @@ const Sidebar = () => {
     });
 
   return (
-    <aside className={`vendor-sidebar ${collapsed ? "vendor-sidebar--collapsed" : ""}`} aria-label="Vendor navigation">
+    <>
+    <button
+      type="button"
+      className="nav-hamburger"
+      aria-label={menuOpen ? "Close menu" : "Open menu"}
+      aria-expanded={menuOpen}
+      onClick={() => setMenuOpen((open) => !open)}
+    >
+      {menuOpen ? <X size={20} /> : <Menu size={20} />}
+    </button>
+    {menuOpen && (
+      <button
+        type="button"
+        className="nav-backdrop"
+        aria-label="Close menu"
+        onClick={() => setMenuOpen(false)}
+      />
+    )}
+    <aside className={`vendor-sidebar ${collapsed ? "vendor-sidebar--collapsed" : ""} ${menuOpen ? "vendor-sidebar--open" : ""}`} aria-label="Vendor navigation">
       <div className="vendor-sidebar__logo">
-        <img src={collapsed ? shortLogo : logo} alt="Ayurmuni" className="vendor-sidebar__logo-img" />
+        <img src={collapsed && !menuOpen ? shortLogo : logo} alt="Ayurmuni" className="vendor-sidebar__logo-img" />
         <button
           type="button"
           className="vendor-sidebar__toggle ds-focus"
@@ -131,10 +176,10 @@ const Sidebar = () => {
 
       {itsverify ? (
         <nav className="vendor-sidebar__nav">
-          <p className="vendor-sidebar__section">{!collapsed && "Menu"}</p>
+          <p className="vendor-sidebar__section">{(!collapsed || menuOpen) && "Menu"}</p>
           <div className="vendor-sidebar__group">{renderMenu(MENU_ITEMS)}</div>
 
-          <p className="vendor-sidebar__section">{!collapsed && "General"}</p>
+          <p className="vendor-sidebar__section">{(!collapsed || menuOpen) && "General"}</p>
           <div className="vendor-sidebar__group">{renderMenu(GENERAL_ITEMS)}</div>
         </nav>
       ) : (
@@ -142,11 +187,11 @@ const Sidebar = () => {
           <div className="vendor-sidebar__pending-icon">
             <Clock3 size={collapsed ? 24 : 32} />
           </div>
-          {!collapsed && (
+          {(!collapsed || menuOpen) && (
             <>
               <h3>Verification Pending</h3>
               <p>Your profile is under review.</p>
-              <button type="button" onClick={() => navigate("/vendor/help-support")}>
+              <button type="button" onClick={() => goTo("/vendor/help-support")}>
                 Contact Support
               </button>
             </>
@@ -154,6 +199,7 @@ const Sidebar = () => {
         </div>
       )}
     </aside>
+    </>
   );
 };
 

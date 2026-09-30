@@ -26,7 +26,7 @@ const CalendarDayCard = ({ date, isCurrentMonth, isToday, isPast, slots, appoint
     return (
         <div
             className={`
-        min-h-[140px] border-2 rounded-xl p-2 transition-all duration-200 relative
+        min-h-[96px] sm:min-h-[140px] border-2 rounded-xl p-1 sm:p-2 transition-all duration-200 relative
         ${getDayStyle()}
       `}
             onMouseEnter={() => setIsHovered(true)}
