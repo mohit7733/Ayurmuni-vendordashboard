@@ -7,12 +7,14 @@ import {
     Cloud,
     CloudOff,
     CreditCard,
+    Download,
     ExternalLink,
     MapPin,
     Package,
     RefreshCw,
     Truck,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import { vendorService } from "../../../services/vendorService";
 import Ayurvedaimage from "../../../Assests/Ayurvedaimage.png";
 import DashboardPageShell from "../../components/shared/DashboardPageShell";
@@ -25,6 +27,7 @@ import {
     formatPaymentLabel,
     formatStatusLabel,
 } from "../Order/orderHelpers";
+import { canDownloadBoxLabel, downloadBoxLabel } from "../Order/boxLabel";
 import "../../components/shared/vendor-shared.css";
 import "../Order/Order.css";
 
@@ -35,6 +38,14 @@ const FULFILLMENT_STEPS = [
     { key: "shipped_at", label: "Shipped", field: "shipped_at" },
     { key: "delivered_at", label: "Delivered", field: "delivered_at" },
 ];
+
+const TERMINAL_STATUSES = new Set(["cancelled", "returned", "refunded"]);
+
+const SOURCE_LABELS = {
+    system: "System",
+    unicommerce: "Unicommerce",
+    admin: "Admin",
+};
 
 const SHIPPING_LABELS = {
     STD: "Standard",
@@ -68,6 +79,161 @@ function formatShippingMethod(method) {
     if (!method) return "—";
     const key = String(method).toUpperCase();
     return SHIPPING_LABELS[key] || formatStatusLabel(method);
+}
+
+function statusStepLabel(status) {
+    const key = String(status || "").toLowerCase();
+    if (key === "created" || key === "placed" || key === "order_placed") return "Order placed";
+    return formatStatusLabel(key);
+}
+
+function sourceLabel(source) {
+    if (!source) return "";
+    const key = String(source).toLowerCase();
+    return SOURCE_LABELS[key] || formatStatusLabel(source);
+}
+
+function buildStepsFromHistory(order) {
+    const history = Array.isArray(order?.status_history) ? order.status_history : [];
+    const entries = history
+        .filter((entry) => entry?.status)
+        .slice()
+        .sort((a, b) => {
+            const aTime = new Date(a.created_at || 0).getTime();
+            const bTime = new Date(b.created_at || 0).getTime();
+            return aTime - bTime;
+        });
+
+    if (!entries.length) return null;
+
+    const currentStatus = String(
+        order.order_status || entries[entries.length - 1].status || ""
+    ).toLowerCase();
+    const lastHistoryStatus = String(entries[entries.length - 1].status || "").toLowerCase();
+
+    const steps = entries.map((entry, index) => {
+        const status = String(entry.status || "").toLowerCase();
+        return {
+            key: entry.id || `${status}-${entry.created_at || index}`,
+            label: statusStepLabel(status),
+            timestamp: entry.created_at,
+            note: entry.note || "",
+            source: sourceLabel(entry.source),
+            done: true,
+            isCurrent: index === entries.length - 1 && status === currentStatus,
+            alert: TERMINAL_STATUSES.has(status),
+        };
+    });
+
+    if (currentStatus && currentStatus !== lastHistoryStatus) {
+        const previous = steps[steps.length - 1];
+        if (previous) previous.isCurrent = false;
+        steps.push({
+            key: `current-${currentStatus}`,
+            label: statusStepLabel(currentStatus),
+            timestamp: null,
+            note: "",
+            source: "",
+            done: false,
+            isCurrent: true,
+            alert: TERMINAL_STATUSES.has(currentStatus),
+        });
+    }
+
+    return steps;
+}
+
+const AMOUNT_KEY_LABELS = {
+    items_total: "Items total",
+    items_subtotal: "Items subtotal",
+    subtotal: "Subtotal",
+    discount: "Coupon discount",
+    delivery_charges: "Delivery charges",
+    shipping_charges: "Delivery charges",
+    cod_charges: "COD charges",
+    tax_amount: "Tax",
+    gst_amount: "GST",
+    product_gst: "Product GST",
+    platform_fee: "Platform fee",
+    other_charges: "Other charges",
+    additional_charges: "Additional charges",
+    prepaid_amount: "Prepaid amount",
+    total_amount: "Order total",
+};
+
+const AMOUNT_KEY_ALIASES = {
+    items_subtotal: ["items_total", "subtotal"],
+    items_total: ["items_subtotal", "subtotal"],
+    subtotal: ["items_subtotal", "items_total"],
+    product_gst: ["gst_amount"],
+    gst_amount: ["product_gst"],
+    delivery_charges: ["shipping_charges"],
+    shipping_charges: ["delivery_charges"],
+};
+
+function amountLabel(key, fallback) {
+    if (fallback) return fallback;
+    return AMOUNT_KEY_LABELS[key] || formatStatusLabel(key);
+}
+
+function isRenderableAmount(value) {
+    const amount = Number(value);
+    return Number.isFinite(amount) && amount >= 0;
+}
+
+function getAmountBreakup(order) {
+    const breakup = order?.amount_breakup;
+    if (!breakup || typeof breakup !== "object") {
+        return { rows: [], total: order?.total_amount };
+    }
+
+    const lines = Array.isArray(breakup.lines) ? breakup.lines : [];
+    const covered = new Set(["currency", "lines", "total_amount"]);
+    const rows = [];
+
+    const markCovered = (key) => {
+        if (!key) return;
+        covered.add(key);
+        (AMOUNT_KEY_ALIASES[key] || []).forEach((alias) => covered.add(alias));
+    };
+
+    lines.forEach((line, index) => {
+        if(line?.key === "coupon_discount"){
+            return;
+        }
+        if (!isRenderableAmount(line?.amount)) return;
+        const key = String(line.key || `line-${index}`);
+        markCovered(key);
+        rows.push({
+            key,
+            label: amountLabel(key, line.label),
+            amount: Number(line.amount),
+            effect: line.effect === "subtract" ? "subtract" : "add",
+        });
+    });
+
+    Object.entries(breakup).forEach(([key, value]) => {
+        if (covered.has(key) || !isRenderableAmount(value)) return;
+        markCovered(key);
+        rows.push({
+            key,
+            label: amountLabel(key),
+            amount: Number(value),
+            effect: key === "discount" ? "subtract" : "add",
+        });
+    });
+
+    return {
+        rows,
+        total: isRenderableAmount(breakup.total_amount)
+            ? Number(breakup.total_amount)
+            : order?.total_amount,
+    };
+}
+
+function formatBreakupAmount(amount, effect) {
+    const formatted = formatCurrency(amount);
+    return effect === "subtract" ? `−${formatted}` : formatted;
 }
 
 function syncBadgeProps(syncStatus) {
@@ -166,6 +332,10 @@ export default function OrderDetail() {
 
     const fulfillmentSteps = useMemo(() => {
         if (!order) return [];
+
+        const fromHistory = buildStepsFromHistory(order);
+        if (fromHistory) return fromHistory;
+
         const status = String(order.order_status || "").toLowerCase();
         const cancelled = status === "cancelled" || status === "returned";
         const lastDoneIndex = FULFILLMENT_STEPS.reduce(
@@ -181,18 +351,30 @@ export default function OrderDetail() {
             return {
                 ...step,
                 timestamp,
+                note: "",
+                source: "",
                 done,
                 isCurrent,
-                cancelled,
+                alert: false,
             };
         });
     }, [order]);
 
     const paymentPaidAt = formatOrderDate(order?.payment?.paid_at);
+    const amountBreakup = useMemo(() => getAmountBreakup(order), [order]);
     const syncProps = syncBadgeProps(order?.unicommerce_sync_status);
     const syncFailed =
         String(order?.unicommerce_sync_status || "").toLowerCase() === "failed";
     const SyncIcon = syncFailed ? CloudOff : Cloud;
+    const labelReady = canDownloadBoxLabel(order);
+
+    const handleDownloadLabel = () => {
+        if (!order || !labelReady) return;
+        const result = downloadBoxLabel(order);
+        if (result === "downloaded") {
+            toast.success("Box label downloaded. Open it and print it for the package.");
+        }
+    };
 
     return (
         <DashboardPageShell
@@ -223,6 +405,17 @@ export default function OrderDetail() {
                         <RefreshCw size={16} className={loading ? "animate-spin" : undefined} />
                         Refresh
                     </Button>
+                    {order ? (
+                        <Button
+                            onClick={handleDownloadLabel}
+                            disabled={!labelReady}
+                            className="!text-sm"
+                            title="Print this invoice and stick it on top of the product box at delivery"
+                        >
+                            <Download size={16} />
+                            Download invoice
+                        </Button>
+                    ) : null}
                 </div>
             }
         >
@@ -423,35 +616,45 @@ export default function OrderDetail() {
                                 <ol className="order-fulfillment-timeline">
                                     {fulfillmentSteps.map((step) => {
                                         const stamp = formatOrderDate(step.timestamp);
+                                        const stateClass = step.alert
+                                            ? "is-alert"
+                                            : step.isCurrent
+                                                ? "is-current"
+                                                : step.done
+                                                    ? "is-done"
+                                                    : "is-pending";
+                                        const when = step.timestamp
+                                            ? `${stamp.date}${stamp.time ? ` · ${stamp.time}` : ""}`
+                                            : step.isCurrent
+                                                ? "In progress"
+                                                : "Pending";
+                                        const meta = [when, step.source].filter(Boolean).join(" · ");
                                         return (
                                             <li
                                                 key={step.key}
-                                                className={`order-fulfillment-step ${
-                                                    step.done
-                                                        ? "is-done"
-                                                        : step.isCurrent
-                                                          ? "is-current"
-                                                          : "is-pending"
-                                                }`}
+                                                className={`order-fulfillment-step ${stateClass}`}
                                             >
                                                 <span className="order-fulfillment-dot" aria-hidden />
                                                 <div className="min-w-0">
                                                     <p className="order-fulfillment-title">
                                                         {step.label}
+                                                        {step.isCurrent ? (
+                                                            <span className="order-fulfillment-current">
+                                                                Current
+                                                            </span>
+                                                        ) : null}
                                                     </p>
-                                                    <p className="order-fulfillment-time">
-                                                        {step.done
-                                                            ? `${stamp.date}${stamp.time ? ` · ${stamp.time}` : ""}`
-                                                            : step.isCurrent
-                                                              ? "In progress"
-                                                              : "Pending"}
-                                                    </p>
+                                                    <p className="order-fulfillment-time">{meta}</p>
+                                                    {step.note ? (
+                                                        <p className="order-fulfillment-note">{step.note}</p>
+                                                    ) : null}
                                                 </div>
                                             </li>
                                         );
                                     })}
                                 </ol>
-                                {String(order.order_status || "").toLowerCase() === "cancelled" ? (
+                                {String(order.order_status || "").toLowerCase() === "cancelled" &&
+                                !fulfillmentSteps.some((step) => step.alert) ? (
                                     <p className="mt-3 text-sm text-red-600">
                                         This order was cancelled.
                                     </p>
@@ -468,36 +671,28 @@ export default function OrderDetail() {
                                         label={formatStatusLabel(order.order_status)}
                                     />
                                 </DetailRow>
-                                <DetailRow label="Your subtotal">
-                                    <span className="text-[#0D614E] font-semibold">
-                                        {formatCurrency(order.vendor_items_subtotal)}
-                                    </span>
-                                </DetailRow>
-                                {Number(order.total_discount) > 0 ? (
-                                    <DetailRow label="Discount">
-                                        −{formatCurrency(order.total_discount)}
-                                    </DetailRow>
-                                ) : null}
-                                <DetailRow label="Shipping charges">
-                                    {Number(order.shipping_charges) > 0
-                                        ? formatCurrency(order.shipping_charges)
-                                        : "Free"}
-                                </DetailRow>
-                                {Number(order.cod_charges) > 0 ? (
-                                    <DetailRow label="COD charges">
-                                        {formatCurrency(order.cod_charges)}
-                                    </DetailRow>
-                                ) : null}
+                                {amountBreakup.rows.map((row) => {
+                                    if (row?.amount > 0)
+                                        return (
+                                            <DetailRow key={row.key} label={row.label}>
+                                                <span
+                                                    className={
+                                                        row.key === "items_subtotal" ||
+                                                            row.key === "items_total"
+                                                            ? "text-[#0D614E] font-semibold"
+                                                            : undefined
+                                                    }
+                                                >
+                                                    {formatBreakupAmount(row.amount, row.effect)}
+                                                </span>
+                                            </DetailRow>
+                                        );
+                                })}
                                 <DetailRow label="Order total">
                                     <span className="font-semibold">
-                                        {formatCurrency(order.total_amount)}
+                                        {formatCurrency(amountBreakup.total)}
                                     </span>
                                 </DetailRow>
-                                {order.payment_type === "prepaid" && order.prepaid_amount != null ? (
-                                    <DetailRow label="Prepaid amount">
-                                        {formatCurrency(order.prepaid_amount)}
-                                    </DetailRow>
-                                ) : null}
                             </div>
 
                             <div className="ds-card order-detail-section">
@@ -554,6 +749,9 @@ export default function OrderDetail() {
                                 <DetailRow label="Courier">
                                     {order.courier_name || "—"}
                                 </DetailRow>
+                                <DetailRow label="Invoice">
+                                    {order.unicommerce_invoice_display_code || "Not issued yet"}
+                                </DetailRow>
                                 <DetailRow label="Tracking">
                                     {order.tracking_number ? (
                                         <span className="inline-flex items-center gap-2">
@@ -580,6 +778,29 @@ export default function OrderDetail() {
                                         <ExternalLink size={14} />
                                     </a>
                                 ) : null}
+                                <div className="mt-4 rounded-lg border border-[#0D614E]/15 bg-[#0D614E]/5 p-3">
+                                    <p className="text-sm font-semibold text-gray-800">
+                                        Box top label
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Download the invoice and stick it on top of the product
+                                        box before delivery.
+                                    </p>
+                                    <Button
+                                        onClick={handleDownloadLabel}
+                                        disabled={!labelReady}
+                                        className="mt-3 !text-sm"
+                                    >
+                                        <Download size={16} />
+                                        Download invoice
+                                    </Button>
+                                    {!labelReady ? (
+                                        <p className="text-xs text-gray-400 mt-2">
+                                            Available after the order is packed and the invoice is
+                                            issued.
+                                        </p>
+                                    ) : null}
+                                </div>
                             </div>
 
                             <div className="ds-card order-detail-section">

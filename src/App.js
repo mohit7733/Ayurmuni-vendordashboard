@@ -62,6 +62,8 @@ const BulkUploadProducts = lazy(() => import("./Vendor_dashboard/Pages/Inventory
 const UnavailableFeature = lazy(() => import("./Vendor_dashboard/Pages/Unavailable/UnavailableFeature"));
 const CustomerDetail = lazy(() => import("./Vendor_dashboard/Pages/Customers/CustomerDetail"));
 const VendorSettings = lazy(() => import("./Vendor_dashboard/Pages/Settings/Settings"));
+const VendorImagesGeneration = lazy(() => import("./common/imagegeneration"));
+
 
 const ComingSoonFinance = () => (
   <UnavailableFeature
@@ -273,6 +275,7 @@ function App() {
                 <Route path="catalog" element={<VendorCatalog />} />
                 <Route path="new-product" element={<AddProduct />} />
                 <Route path="bulk-upload-products" element={<BulkUploadProducts />} />
+                <Route path="image-links" element={<VendorImagesGeneration />} />
                 <Route path="edit-product/:id" element={<EditProduct />} />
                 <Route path="orders" element={<Order />} />
                 <Route path="orders/:id" element={<OrderDetail />} />

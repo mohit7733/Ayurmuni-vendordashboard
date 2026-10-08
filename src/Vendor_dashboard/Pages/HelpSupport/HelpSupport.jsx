@@ -23,7 +23,7 @@ const faqs = [
 
 const CONTACT_CARDS = [
     { icon: Mail, title: "Email Support", value: "support@ayurmuni.com", meta: "Response within 24 hours", iconBg: "bg-emerald-50", iconColor: "text-[#0D614E]" },
-    { icon: Phone, title: "Phone Support", value: "+91 98765 43210", meta: "Mon–Sat, 9 AM – 6 PM IST", iconBg: "bg-blue-50", iconColor: "text-blue-600" },
+    { icon: Phone, title: "Phone Support", value: "+91 70423 76400", meta: "Mon–Sat, 9 AM – 6 PM IST", iconBg: "bg-blue-50", iconColor: "text-blue-600" },
     { icon: MessageCircle, title: "Vendor Desk", value: "Chat with our vendor success team", meta: "Available for verified vendors", iconBg: "bg-purple-50", iconColor: "text-purple-600" },
 ];
 

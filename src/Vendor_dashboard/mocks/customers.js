@@ -5,7 +5,7 @@ export const MOCK_CUSTOMERS = [
     id: 1,
     name: "Priya Sharma",
     email: "priya@example.com",
-    phone: "+91 98765 43210",
+    phone: "+91 70423 76400",
     orders_count: 12,
     lifetime_value: 24500,
     last_order_at: "2026-07-28",

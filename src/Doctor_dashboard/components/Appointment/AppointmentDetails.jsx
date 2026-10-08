@@ -19,6 +19,7 @@ import {
     Building, Home, Shield, Eye, Printer, Share2, MoreVertical,
     Search, Filter, DownloadCloud, Printer as PrintIcon, Edit3,
     Package,
+    Hash,
     Thermometer,
     Notebook,
     CheckCircle2,
@@ -77,6 +78,59 @@ const formatSlotDateTime = (date, time) => {
         hour: '2-digit',
         minute: '2-digit'
     });
+};
+
+const formatPackageMoney = (amount, currency = 'INR') => {
+    if (amount == null || amount === '') return '—';
+    const value = Number(amount);
+    if (Number.isNaN(value)) return String(amount);
+    try {
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: currency || 'INR',
+            maximumFractionDigits: value % 1 === 0 ? 0 : 2,
+        }).format(value);
+    } catch {
+        return `₹${value}`;
+    }
+};
+
+const ENTITLEMENT_STATUS = {
+    available: { label: 'Available', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', bar: 'bg-emerald-500' },
+    exhausted: { label: 'Used', className: 'bg-amber-50 text-amber-700 border-amber-200', bar: 'bg-amber-400' },
+    expired: { label: 'Expired', className: 'bg-gray-100 text-gray-500 border-gray-200', bar: 'bg-gray-300' },
+};
+
+const PACKAGE_STATUS = {
+    active: { label: 'Active', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    pending: { label: 'Pending', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+    expired: { label: 'Expired', className: 'bg-gray-100 text-gray-500 border-gray-200' },
+    cancelled: { label: 'Cancelled', className: 'bg-rose-50 text-rose-600 border-rose-200' },
+    canceled: { label: 'Cancelled', className: 'bg-rose-50 text-rose-600 border-rose-200' },
+};
+
+const formatPackageDate = (value) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const getDaysUntil = (value) => {
+    if (!value) return null;
+    const target = new Date(value);
+    if (Number.isNaN(target.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+    return Math.round((target.getTime() - today.getTime()) / 86400000);
+};
+
+const entitlementRemainingPercent = (remaining, total) => {
+    const left = Number(remaining);
+    const all = Number(total);
+    if (Number.isNaN(left) || Number.isNaN(all) || all <= 0) return null;
+    return Math.max(0, Math.min(100, (left / all) * 100));
 };
 
 const formatDurationLabel = (duration) => {
@@ -224,6 +278,113 @@ const SectionHeader = ({ icon: Icon, title, action, badge }) => (
         {action}
     </div>
 );
+
+const PatientPackageCard = ({ purchase }) => {
+    const paid = Number(purchase.paid_price);
+    const original = Number(purchase.original_price);
+    const showOriginal = !Number.isNaN(original) && !Number.isNaN(paid) && original > paid;
+    const statusKey = String(purchase.status || 'active').toLowerCase();
+    const statusStyle = PACKAGE_STATUS[statusKey] || {
+        label: purchase.status || 'Active',
+        className: 'bg-emerald-50 text-[#0D614E] border-emerald-100',
+    };
+    const started = formatPackageDate(purchase.starts_at || purchase.paid_at);
+    const expires = formatPackageDate(purchase.expires_at);
+    const daysLeft = getDaysUntil(purchase.expires_at);
+    const expiryUrgent = daysLeft != null && daysLeft >= 0 && daysLeft <= 7;
+    const expiryLabel = daysLeft == null
+        ? null
+        : daysLeft < 0
+            ? 'Expired'
+            : daysLeft === 0
+                ? 'Expires today'
+                : daysLeft === 1
+                    ? '1 day left'
+                    : `${daysLeft} days left`;
+    const entitlements = Array.isArray(purchase.entitlements) ? purchase.entitlements : [];
+
+    return (
+        <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50/90 via-white to-white overflow-hidden">
+            <div className="px-3.5 pt-3.5 pb-3">
+                <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 leading-snug line-clamp-2">
+                            {purchase.package_name_snapshot || purchase.package_snapshot?.name || 'Package'}
+                        </p>
+                        {purchase.package_snapshot?.category_name && (
+                            <p className="text-[11px] text-gray-500 mt-0.5 truncate">{purchase.package_snapshot.category_name}</p>
+                        )}
+                    </div>
+                    <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border capitalize ${statusStyle.className}`}>
+                        {statusStyle.label}
+                    </span>
+                </div>
+                <div className="flex items-baseline gap-1.5 mt-2.5">
+                    {showOriginal && (
+                        <span className="text-[11px] text-gray-400 line-through">
+                            {formatPackageMoney(purchase.original_price, purchase.currency)}
+                        </span>
+                    )}
+                    <span className="text-base font-bold text-[#0D614E] leading-none">
+                        {formatPackageMoney(purchase.paid_price, purchase.currency)}
+                    </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-3">
+                    <div className="rounded-lg bg-white/90 border border-gray-100 px-2.5 py-2">
+                        <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Started</p>
+                        <p className="text-xs font-semibold text-gray-800 mt-0.5">{started || '—'}</p>
+                    </div>
+                    <div className={`rounded-lg border px-2.5 py-2 ${expiryUrgent ? 'bg-amber-50 border-amber-100' : 'bg-white/90 border-gray-100'}`}>
+                        <p className={`text-[10px] font-medium uppercase tracking-wide ${expiryUrgent ? 'text-amber-600' : 'text-gray-400'}`}>Expires</p>
+                        <p className={`text-xs font-semibold mt-0.5 ${expiryUrgent ? 'text-amber-800' : 'text-gray-800'}`}>{expires || 'No expiry'}</p>
+                        {expiryLabel && (
+                            <p className={`text-[10px] font-medium mt-0.5 ${daysLeft < 0 ? 'text-gray-400' : expiryUrgent ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                {expiryLabel}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            </div>
+            {entitlements.length > 0 && (
+                <div className="px-3.5 pb-3.5 pt-3 border-t border-emerald-100/80 space-y-2">
+                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Included</p>
+                    {entitlements.map((item) => {
+                        const progress = entitlementRemainingPercent(item.quantity_remaining, item.quantity_total);
+                        const itemStatus = ENTITLEMENT_STATUS[item.status] || {
+                            label: item.status || '—',
+                            className: 'bg-gray-100 text-gray-500 border-gray-200',
+                            bar: 'bg-gray-300',
+                        };
+                        const low = progress != null && progress > 0 && progress <= 30 && item.status === 'available';
+                        return (
+                            <div key={item.id} className="rounded-lg bg-white border border-gray-100 px-2.5 py-2">
+                                <div className="flex items-start justify-between gap-2">
+                                    <p className="text-xs font-medium text-gray-800 leading-snug min-w-0">{item.label}</p>
+                                    <span className={`shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border ${itemStatus.className}`}>
+                                        {itemStatus.label}
+                                    </span>
+                                </div>
+                                {progress != null && (
+                                    <>
+                                        <div className="mt-2 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${low ? 'bg-amber-500' : itemStatus.bar}`}
+                                                style={{ width: `${progress}%` }}
+                                            />
+                                        </div>
+                                        <p className="mt-1 text-[10px] text-gray-400">
+                                            {Number(item.quantity_remaining)} of {Number(item.quantity_total)} remaining
+                                        </p>
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
+    );
+};
 
 const InfoRow = ({ label, value, mono, highlight }) => (
     <div className="flex items-center justify-between py-3 border-b border-gray-50 last:border-0">
@@ -494,6 +655,7 @@ const PrescriptionTemplate = React.forwardRef(({ appointment, formData, doctor, 
                                         <th className="px-6 py-4 text-left text-sm font-semibold">Dosage</th>
                                         <th className="px-6 py-4 text-left text-sm font-semibold">Frequency</th>
                                         <th className="px-6 py-4 text-left text-sm font-semibold">Duration</th>
+                                        <th className="px-6 py-4 text-left text-sm font-semibold">Quantity</th>
                                         <th className="px-6 py-4 text-left text-sm font-semibold">Instructions</th>
                                     </tr>
                                 </thead>
@@ -508,12 +670,13 @@ const PrescriptionTemplate = React.forwardRef(({ appointment, formData, doctor, 
                                                 <td className="px-6 py-5 text-gray-700">{med.dosage || '—'}</td>
                                                 <td className="px-6 py-5 text-gray-700">{med.frequency || '—'}</td>
                                                 <td className="px-6 py-5 text-gray-700">{formatDurationLabel(med.duration)}</td>
+                                                <td className="px-6 py-5 text-gray-700">{med.quantity || '—'}</td>
                                                 <td className="px-6 py-5 text-sm text-gray-600 italic">{med.instruction || '—'}</td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan="5" className="px-6 py-12 text-center text-gray-400 text-base">
+                                            <td colSpan="6" className="px-6 py-12 text-center text-gray-400 text-base">
                                                 No medicines prescribed
                                             </td>
                                         </tr>
@@ -864,6 +1027,7 @@ const AppointmentDetail = ({ videodetails }) => {
         dosage: '',
         frequency: '',
         duration: '',
+        quantity: 1,
         instruction: ''
     });
 
@@ -880,6 +1044,8 @@ const AppointmentDetail = ({ videodetails }) => {
     const [medicines, setMedicines] = useState([]);
     const [uploading, setUploading] = useState(false);
     const [patientHistory, setPatientHistory] = useState([]);
+    const [patientPackages, setPatientPackages] = useState([]);
+    const [packagesLoading, setPackagesLoading] = useState(false);
     const [patientDocument, setPatientDocument] = useState([]);
     const [loader, setloader] = useState(false)
     const [showUploadModal, setShowUploadModal] = useState(false);
@@ -939,12 +1105,36 @@ const AppointmentDetail = ({ videodetails }) => {
             //     follow_up: { schedule: false, date: '', reason: '' }
             // });
             fetchPatientHistory(apiData?.patient?.id);
+            fetchPatientPackages(apiData?.patient?.id);
             fetchPatientDocuments(type == "patient" ? apiData?.patient?.id : apiData?.id)
         } catch (err) {
             console.error('Error fetching appointment:', err);
             toast.error(err?.response?.data?.message || 'Failed to load appointment');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchPatientPackages = async (id) => {
+        if (!id) {
+            setPatientPackages([]);
+            return;
+        }
+        try {
+            setPackagesLoading(true);
+            const response = await doctorService.getPatientPackages(id);
+            const payload = response?.data?.data || response?.data || {};
+            const results = Array.isArray(payload?.results)
+                ? payload.results
+                : Array.isArray(payload)
+                    ? payload
+                    : [];
+            setPatientPackages(results);
+        } catch (error) {
+            setPatientPackages([]);
+            toast.error(error?.message || error?.response?.data?.message || 'Failed to load patient package');
+        } finally {
+            setPackagesLoading(false);
         }
     };
 
@@ -1087,25 +1277,32 @@ const AppointmentDetail = ({ videodetails }) => {
             !String(newMed.medicine || '').trim() ||
             !String(newMed.dosage || '').trim() ||
             !String(newMed.frequency || '').trim() ||
-            !String(newMed.duration || '').trim()
+            !String(newMed.duration || '').trim() ||
+            !Number.isInteger(Number(newMed.quantity)) ||
+            Number(newMed.quantity) < 1
         ) {
-            toast.error("Please select a medicine and fill dosage, frequency, and duration");
+            toast.error("Please select a medicine and fill dosage, frequency, duration, and quantity");
             return;
         }
         setFormData(prev => ({
             ...prev,
-            prescriptions: [...prev.prescriptions, { ...newMed, id: Date.now(), prescribed_at: new Date().toISOString() }]
+            prescriptions: [...prev.prescriptions, { ...newMed, quantity: Number(newMed.quantity), id: Date.now(), prescribed_at: new Date().toISOString() }]
         }));
-        setNewMed({ medicine_name: '', dosage: '', frequency: '', duration: '', instruction: '', medicine: '', medicinedata: {} });
+        setNewMed({ medicine_name: '', dosage: '', frequency: '', duration: '', quantity: 1, instruction: '', medicine: '', medicinedata: {} });
         setShowAddMed(false);
         setShowDropdown(false);
         setSearch("");
     };
 
     const handleUpdatePrescription = (id, updatedMed) => {
+        const quantity = Number(updatedMed.quantity);
+        if (!Number.isInteger(quantity) || quantity < 1) {
+            toast.error("Please enter a valid quantity (1, 2, 3...)");
+            return;
+        }
         setFormData(prev => ({
             ...prev,
-            prescriptions: prev.prescriptions.map(med => med.id === id ? { ...med, ...updatedMed } : med)
+            prescriptions: prev.prescriptions.map(med => med.id === id ? { ...med, ...updatedMed, quantity } : med)
         }));
         setEditingPrescription(null);
     };
@@ -1163,6 +1360,7 @@ const AppointmentDetail = ({ videodetails }) => {
         dosage: med?.dosage || "",
         frequency: med?.frequency || "",
         duration: med?.duration || "",
+        quantity: Number(med?.quantity) > 0 ? Number(med.quantity) : 1,
         instruction: med?.instruction || "",
     });
 
@@ -1175,6 +1373,7 @@ const AppointmentDetail = ({ videodetails }) => {
             dosage: med.dosage || "",
             frequency: med.frequency || "",
             duration: med.duration || "",
+            quantity: Number(med.quantity) > 0 ? Number(med.quantity) : 1,
             instruction: med.instruction || "",
             medicinedata: med.medicinedata || med.medicine || med,
         }));
@@ -1340,6 +1539,10 @@ const AppointmentDetail = ({ videodetails }) => {
         setUpdating(true)
 
         const isEditing = Boolean(editingPrescriptionId);
+        const prescriptionItems = (formData.prescriptions || []).map((med) => ({
+            ...med,
+            quantity: Number(med.quantity) > 0 ? Number(med.quantity) : 1,
+        }));
         const prescriptionData = isEditing
             ? {
                 symptom_description: formData.symptom_description,
@@ -1355,7 +1558,7 @@ const AppointmentDetail = ({ videodetails }) => {
                 personal_history: formData.personal_history,
                 gynaecological : formData.gynaecological ,
                 status: editingPrescriptionStatus || "sent",
-                prescription_items: formData.prescriptions,
+                prescription_items: prescriptionItems,
             }
             : {
                 id: Date.now().toString(),
@@ -1369,7 +1572,7 @@ const AppointmentDetail = ({ videodetails }) => {
                 personal_history: formData.personal_history,
                 gynaecological : formData.gynaecological ,
                 diagnosis_advice: formData.diagnosis,
-                prescription_items: formData.prescriptions,
+                prescription_items: prescriptionItems,
                 follow_up: formData.follow_up,
                 dos: convertBulletTextToArray(formData?.dos),
                 donts: convertBulletTextToArray(formData?.donts)
@@ -1428,6 +1631,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                 String(original.dosage || "") !== String(payload.dosage) ||
                                 String(original.frequency || "") !== String(payload.frequency) ||
                                 String(original.duration || "") !== String(payload.duration) ||
+                                Number(original.quantity || 0) !== Number(payload.quantity) ||
                                 String(original.instruction || "") !== String(payload.instruction);
                             if (hasChanged) {
                                 await doctorService.updatePrescriptionItem(med.id, payload);
@@ -1763,6 +1967,37 @@ const AppointmentDetail = ({ videodetails }) => {
                             </div>
                         </SectionCard>
 
+                        {/* Patient Package */}
+                        <SectionCard className="overflow-hidden">
+                            <SectionHeader
+                                icon={Package}
+                                title="Active Package"
+                                badge={patientPackages.length || undefined}
+                            />
+                            <div className="p-3.5">
+                                {packagesLoading ? (
+                                    <div className="flex flex-col items-center justify-center gap-2 py-8">
+                                        <Loader2 className="w-5 h-5 animate-spin text-[#0D614E]" />
+                                        <p className="text-[11px] text-gray-400">Loading package…</p>
+                                    </div>
+                                ) : patientPackages.length === 0 ? (
+                                    <div className="flex flex-col items-center text-center py-6 px-2">
+                                        <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-2.5">
+                                            <Package className="w-4 h-4 text-gray-300" />
+                                        </div>
+                                        <p className="text-xs font-medium text-gray-600">No active package</p>
+                                        <p className="text-[11px] text-gray-400 mt-0.5">This patient does not have a package on file.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {patientPackages.map((purchase) => (
+                                            <PatientPackageCard key={purchase.id} purchase={purchase} />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </SectionCard>
+
                         {/* Appointment Info */}
                         {
                             appointment?.appointment_date &&
@@ -1777,7 +2012,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                             {consultationLabel}
                                         </span>
                                     } />
-                                    <InfoRow label="Amount" value={`₹${appointment?.amount}`} highlight />
+                                    {/* <InfoRow label="Amount" value={`₹${appointment?.amount}`} highlight /> */}
                                 </div>
                             </SectionCard>
                         }
@@ -1795,7 +2030,7 @@ const AppointmentDetail = ({ videodetails }) => {
                         </SectionCard>
 
                         {/* Emergency Contact */}
-                        {(patient?.emergency_contact_name || patient?.emergency_contact_phone) && (
+                        {/* {(patient?.emergency_contact_name || patient?.emergency_contact_phone) && (
                             <SectionCard>
                                 <SectionHeader icon={Shield} title="Emergency Contact" />
                                 <div className="p-5">
@@ -1804,7 +2039,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                     {patient.emergency_contact_phone && <InfoRow label="Phone" value={patient.emergency_contact_phone} />}
                                 </div>
                             </SectionCard>
-                        )}
+                        )} */}
                     </div>
 
                     {/* Right Panel */}
@@ -1996,7 +2231,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                 setShowAddMed(false);
                                                                 setShowDropdown(false);
                                                                 setSearch('');
-                                                                setNewMed({ medicine_name: '', dosage: '', frequency: '', duration: '', instruction: '', medicine: '', medicinedata: {} });
+                                                                setNewMed({ medicine_name: '', dosage: '', frequency: '', duration: '', quantity: 1, instruction: '', medicine: '', medicinedata: {} });
                                                             } else {
                                                                 setShowAddMed(true);
                                                             }
@@ -2050,7 +2285,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => {
-                                                                                    setNewMed({ medicine_name: '', dosage: newMed.dosage, frequency: newMed.frequency, duration: newMed.duration, instruction: newMed.instruction, medicine: '', medicinedata: {} });
+                                                                                    setNewMed({ medicine_name: '', dosage: newMed.dosage, frequency: newMed.frequency, duration: newMed.duration, quantity: newMed.quantity, instruction: newMed.instruction, medicine: '', medicinedata: {} });
                                                                                     setSearch('');
                                                                                     setShowDropdown(false);
                                                                                 }}
@@ -2196,7 +2431,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                     )}
                                                                 </div>
 
-                                                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                                                                     <div className="space-y-1.5">
                                                                         <label className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
                                                                             <Package className="w-3 h-3 text-sky-500" /> Dosage *
@@ -2280,6 +2515,39 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                             ))}
                                                                         </div>
                                                                     </div>
+
+                                                                    <div className="space-y-1.5">
+                                                                        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                                                                            <Hash className="w-3 h-3 text-emerald-600" /> Quantity *
+                                                                        </label>
+                                                                        <input
+                                                                            type="number"
+                                                                            min="1"
+                                                                            step="1"
+                                                                            placeholder="e.g. 1"
+                                                                            value={newMed.quantity}
+                                                                            onChange={e => {
+                                                                                const raw = e.target.value;
+                                                                                setNewMed({ ...newMed, quantity: raw === '' ? '' : Math.max(1, parseInt(raw, 10) || 1) });
+                                                                            }}
+                                                                            className="w-full px-3 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                                                                        />
+                                                                        <div className="flex flex-wrap gap-1">
+                                                                            {[1, 2, 3, 5, 10].map(opt => (
+                                                                                <button
+                                                                                    key={opt}
+                                                                                    type="button"
+                                                                                    onClick={() => setNewMed({ ...newMed, quantity: opt })}
+                                                                                    className={`px-2 py-0.5 text-[10px] rounded-md border transition-colors ${Number(newMed.quantity) === opt
+                                                                                        ? 'bg-emerald-100 border-emerald-300 text-emerald-800'
+                                                                                        : 'bg-white border-gray-200 text-gray-500 hover:border-emerald-200 hover:text-emerald-700'
+                                                                                        }`}
+                                                                                >
+                                                                                    {opt}
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
 
                                                                 <div className="space-y-1.5">
@@ -2331,7 +2599,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                             setShowAddMed(false);
                                                                             setShowDropdown(false);
                                                                             setSearch('');
-                                                                            setNewMed({ medicine_name: '', dosage: '', frequency: '', duration: '', instruction: '', medicine: '', medicinedata: {} });
+                                                                            setNewMed({ medicine_name: '', dosage: '', frequency: '', duration: '', quantity: 1, instruction: '', medicine: '', medicinedata: {} });
                                                                         }}
                                                                         className="px-5 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-semibold hover:bg-gray-200 transition-all"
                                                                     >
@@ -2346,10 +2614,11 @@ const AppointmentDetail = ({ videodetails }) => {
                                                 {formData.prescriptions.length > 0 ? (
                                                     <div className="rounded-2xl border border-gray-200 overflow-hidden bg-white">
                                                         <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
-                                                            <div className="col-span-4">Medicine</div>
+                                                            <div className="col-span-3">Medicine</div>
                                                             <div className="col-span-2">Dosage</div>
                                                             <div className="col-span-2">Frequency</div>
                                                             <div className="col-span-2">Duration</div>
+                                                            <div className="col-span-1">Qty</div>
                                                             <div className="col-span-2 text-right">Actions</div>
                                                         </div>
                                                         <div className="divide-y divide-gray-100">
@@ -2363,7 +2632,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                                     Editing medicine #{index + 1}
                                                                                 </span>
                                                                             </div>
-                                                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
                                                                                 <div className="space-y-1">
                                                                                     <label className="text-[10px] font-semibold text-gray-500 uppercase">Medicine</label>
                                                                                     <input
@@ -2400,6 +2669,23 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                                         className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none bg-white"
                                                                                     />
                                                                                 </div>
+                                                                                <div className="space-y-1">
+                                                                                    <label className="text-[10px] font-semibold text-gray-500 uppercase">Quantity</label>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min="1"
+                                                                                        step="1"
+                                                                                        value={editingPrescription.quantity ?? 1}
+                                                                                        onChange={e => {
+                                                                                            const raw = e.target.value;
+                                                                                            setEditingPrescription({
+                                                                                                ...editingPrescription,
+                                                                                                quantity: raw === '' ? '' : Math.max(1, parseInt(raw, 10) || 1),
+                                                                                            });
+                                                                                        }}
+                                                                                        className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:border-emerald-400 focus:ring-1 focus:ring-emerald-200 outline-none bg-white"
+                                                                                    />
+                                                                                </div>
                                                                             </div>
                                                                             <div className="space-y-1">
                                                                                 <label className="text-[10px] font-semibold text-gray-500 uppercase">Instructions</label>
@@ -2431,7 +2717,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                     ) : (
                                                                         <div className="p-3.5 sm:px-4 hover:bg-gray-50/80 transition-colors">
                                                                             <div className="flex sm:grid sm:grid-cols-12 gap-3 items-start sm:items-center">
-                                                                                <div className="flex items-center gap-3 flex-1 sm:col-span-4 min-w-0">
+                                                                                <div className="flex items-center gap-3 flex-1 sm:col-span-3 min-w-0">
                                                                                     <span className="w-6 h-6 rounded-md bg-[#0D614E]/10 text-[#0D614E] text-[11px] font-bold flex items-center justify-center flex-shrink-0">
                                                                                         {index + 1}
                                                                                     </span>
@@ -2475,6 +2761,12 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                                         {med.duration || '—'}
                                                                                     </span>
                                                                                 </div>
+                                                                                <div className="hidden sm:block sm:col-span-1">
+                                                                                    <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
+                                                                                        <Hash className="w-3 h-3" />
+                                                                                        {med.quantity || '—'}
+                                                                                    </span>
+                                                                                </div>
 
                                                                                 <div className="flex items-center gap-1 sm:col-span-2 sm:justify-end flex-shrink-0">
                                                                                     <button
@@ -2511,6 +2803,11 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                                 {med.duration && (
                                                                                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md">
                                                                                         <CalendarDays className="w-3 h-3" />{med.duration}
+                                                                                    </span>
+                                                                                )}
+                                                                                {med.quantity && (
+                                                                                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                                                                                        <Hash className="w-3 h-3" />Qty {med.quantity}
                                                                                     </span>
                                                                                 )}
                                                                             </div>
@@ -3529,6 +3826,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                                                 <th className="px-4 py-3 text-left font-semibold">Dosage</th>
                                                                                                 <th className="px-4 py-3 text-left font-semibold">Frequency</th>
                                                                                                 <th className="px-4 py-3 text-left font-semibold">Duration</th>
+                                                                                                <th className="px-4 py-3 text-left font-semibold">Quantity</th>
                                                                                                 <th className="px-4 py-3 text-left font-semibold">Instructions</th>
                                                                                             </tr>
                                                                                         </thead>
@@ -3542,6 +3840,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                                                                                     <td className="px-4 py-4 text-gray-700">{med.dosage || '—'}</td>
                                                                                                     <td className="px-4 py-4 text-gray-700">{med.frequency || '—'}</td>
                                                                                                     <td className="px-4 py-4 text-gray-700">{formatDurationLabel(med.duration)}</td>
+                                                                                                    <td className="px-4 py-4 text-gray-700">{med.quantity || '—'}</td>
                                                                                                     <td className="px-4 py-4 text-sm text-gray-600 italic">{med.instruction || '—'}</td>
                                                                                                 </tr>
                                                                                             ))}

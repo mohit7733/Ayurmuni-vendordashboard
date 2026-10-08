@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
     Bell,
     ChevronRight,
+    Link2Icon,
     LogOut,
     Search,
     Settings,
@@ -20,6 +21,7 @@ const VENDOR_TITLES = {
     "/vendor/products": "Products",
     "/vendor/stock": "Stock Management",
     "/vendor/banners": "Banners",
+    "/vendor/image-links": "Image Links",
     "/vendor/catalog": "Catalog Reference",
     "/vendor/new-product": "Add Product",
     "/vendor/orders": "Orders",
@@ -266,6 +268,15 @@ const Header = () => {
                             {pageActions}
                         </div>
                     )}
+
+                    <button
+                        type="button"
+                        className="vendor-header__icon-btn ds-focus"
+                        onClick={() => navigate("/vendor/image-links")}
+                        aria-label={`Images Url Generation`}
+                    >   
+                        <Link2Icon size={18} />
+                    </button>
 
                     {/* Notifications */}
                     <button

@@ -849,7 +849,6 @@ export default function AddProduct() {
     };
 
     try {
-      console.log(productData);
 
       const response = await vendorService.addProduct(productData);
       if (response.data.success) {
@@ -972,8 +971,8 @@ export default function AddProduct() {
                             type="button"
                             key={category}
                             className={`service-category-pill ${selectedServiceCategory.toLowerCase() === category.toLowerCase()
-                                ? "active"
-                                : ""
+                              ? "active"
+                              : ""
                               }`}
                             onClick={() => handleServiceCategorySelect(category)}
                           >
@@ -1515,15 +1514,44 @@ export default function AddProduct() {
                   >
                     <option value="">Select Type</option>
                     {[
-                      { value: "tablet", label: "Tablet" },
                       { value: "capsule", label: "Capsule" },
-                      { value: "powder", label: "Powder" },
-                      { value: "syrup", label: "Syrup" },
-                      { value: "oil", label: "Oil" },
                       { value: "cream", label: "Cream" },
-                      { value: "gel", label: "Gel" },
                       { value: "drops", label: "Drops" },
+                      { value: "gas", label: "Gas" },
+                      { value: "gel", label: "Gel" },
                       { value: "juice", label: "Juice" },
+                      { value: "liquid", label: "Liquid" },
+                      { value: "oil", label: "Oil" },
+                      { value: "powder", label: "Powder" },
+                      { value: "solid", label: "Solid" },
+                      { value: "tablet", label: "Tablet" },
+                      { value: "syrup", label: "Syrup" },
+                      { value: "ointment", label: "Ointment" },
+                      { value: "paste", label: "Paste" },
+                      { value: "semi_solid", label: "Semi-Solid" },
+                      { value: "lotion", label: "Lotion" },
+                      { value: "balm", label: "Balm" },
+                      { value: "spray", label: "Spray" },
+                      { value: "foam", label: "Foam" },
+                      { value: "granules", label: "Granules" },
+                      { value: "lozenges", label: "Lozenges" },
+                      { value: "chewable", label: "Chewable" },
+                      { value: "effervescent", label: "Effervescent" },
+                      { value: "sachet", label: "Sachet" },
+                      { value: "extract", label: "Extract" },
+                      { value: "tincture", label: "Tincture" },
+                      { value: "decoction", label: "Decoction" },
+                      { value: "resin", label: "Resin" },
+                      { value: "wax", label: "Wax" },
+                      { value: "suppository", label: "Suppository" },
+                      { value: "pessary", label: "Pessary" },
+                      { value: "patch", label: "Patch" },
+                      { value: "inhaler", label: "Inhaler" },
+                      { value: "shampoo", label: "Shampoo" },
+                      { value: "soap", label: "Soap" },
+                      { value: "toothpaste", label: "Toothpaste" },
+                      { value: "mouthwash", label: "Mouthwash" },
+                      { value: "serum", label: "Serum" },
                       { value: "other", label: "Other" }
                     ].map((data) => (
                       <option key={data.value} value={data.value}>{data.label}</option>

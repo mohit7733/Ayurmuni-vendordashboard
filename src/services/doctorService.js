@@ -626,6 +626,20 @@ export const doctorService = {
         );
     },
 
+    getPatientPackages: (patientId) => {
+        if (!patientId) {
+            return Promise.reject({
+                message: "Patient ID is required",
+                status: 400,
+                data: null
+            });
+        }
+        return handleApiCall(
+            () => API.get(`/packages/doctor/?view=purchases&status=active&patient_id=${patientId}`),
+            "Failed to fetch patient packages"
+        );
+    },
+
     getAppointmentprec: (pid, id) => {
         return handleApiCall(
             () => API.get(`/doctors/prescription/?patient_id=${pid || ''}&appointment_id=${id || ''}`),
