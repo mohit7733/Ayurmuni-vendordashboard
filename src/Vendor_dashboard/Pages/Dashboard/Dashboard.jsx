@@ -14,7 +14,12 @@ import { notificationService } from "../../../services/notificationService";
 import { reviewService } from "../../../services/reviewService";
 import { parseReviewsListResponse } from "../Ratings/ratingHelpers";
 import { parseFinanceMetricsResponse } from "../Finance/financeHelpers";
-import { formatCurrency } from "../Order/orderHelpers";
+import {
+    EMPTY_ORDER_SUMMARY,
+    formatCurrency,
+    parseOrdersListResponse,
+    parseOrdersSummaryResponse,
+} from "../Order/orderHelpers";
 import { getVariantCoverImageUrl } from "../../../utils/unicommerceHelpers";
 import { PageError } from "../../components/shared/PageState";
 import { MetricSkeleton } from "../../components/shared/Skeleton";
@@ -26,6 +31,51 @@ import DashboardRightPanel from "./components/DashboardRightPanel";
 import DashboardProductsTable from "./components/DashboardProductsTable";
 
 const LOW_STOCK_THRESHOLD = 10;
+const EXCLUDED_SALE_STATUSES = new Set(["cancelled", "canceled", "returned", "refunded"]);
+
+function lineRevenue(item) {
+    const total = Number(item.total_amount ?? item.total_price);
+    if (!Number.isNaN(total) && total > 0) return total;
+    const qty = Number(item.quantity) || 0;
+    const price = Number(item.selling_price ?? item.price) || 0;
+    return qty * price;
+}
+
+function buildSalesByProduct(orderItems = []) {
+    const map = new Map();
+    orderItems.forEach((item) => {
+        const status = String(item.status || "").toLowerCase();
+        if (EXCLUDED_SALE_STATUSES.has(status)) return;
+
+        const name = item.product_name || item.name || "Product";
+        const variant = item.variant_title || "";
+        const key = String(item.product_id || item.sku_code || `${name}::${variant}`);
+        const units = Number(item.quantity) || 0;
+        const revenue = lineRevenue(item);
+        if (units <= 0 && revenue <= 0) return;
+        const existing = map.get(key);
+
+        if (existing) {
+            existing.units += units;
+            existing.revenue += revenue;
+            return;
+        }
+
+        map.set(key, {
+            key,
+            name,
+            variant,
+            sku: item.sku_code || "",
+            image: item.product_image || "",
+            units,
+            revenue,
+        });
+    });
+
+    return Array.from(map.values()).sort(
+        (a, b) => b.units - a.units || b.revenue - a.revenue
+    );
+}
 
 function timeAgo(date) {
     const diff = Math.floor((Date.now() - new Date(date)) / 1000);
@@ -49,6 +99,9 @@ const Dashboard = () => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [recentNotifications, setRecentNotifications] = useState([]);
     const [recentOrders, setRecentOrders] = useState([]);
+    const [orderItems, setOrderItems] = useState([]);
+    const [ordersLoadedCount, setOrdersLoadedCount] = useState(0);
+    const [orderSummary, setOrderSummary] = useState(EMPTY_ORDER_SUMMARY);
     const [recentReviews, setRecentReviews] = useState([]);
     const [financeMetrics, setFinanceMetrics] = useState(null);
 
@@ -57,14 +110,15 @@ const Dashboard = () => {
             setLoading(true);
             setError("");
             const notifParams = new URLSearchParams({ view: "list", page: 1, page_size: 5 });
-            const [productsRes, inventoryRes, profileRes, notificationsRes, notifListRes, ordersRes, reviewsRes, financeRes] =
+            const [productsRes, inventoryRes, profileRes, notificationsRes, notifListRes, ordersRes, summaryRes, reviewsRes, financeRes] =
                 await Promise.all([
                     vendorService.getProducts({ page: 1, page_size: 100 }),
                     vendorService.getInventory({ page: 1, page_size: 100 }),
                     vendorService.getProfile(),
                     notificationService.get({ view: "unread_count" }),
                     notificationService.get(notifParams),
-                    vendorService.getOrders({ page: 1, page_size: 5 }).catch(() => null),
+                    vendorService.getOrders({ page: 1, page_size: 100 }).catch(() => null),
+                    vendorService.getOrdersSummary().catch(() => null),
                     reviewService.getVendorReviews({ page: 1, page_size: 5, sort: "newest" }).catch(() => null),
                     vendorService.getFinanceMetrics({ details_limit: 5 }).catch(() => null),
                 ]);
@@ -80,7 +134,13 @@ const Dashboard = () => {
                     timeAgo: n.created_at ? timeAgo(n.created_at) : "",
                 }))
             );
-            setRecentOrders(ordersRes?.data?.data?.results || []);
+            const parsedOrders = parseOrdersListResponse(ordersRes);
+            setOrderItems(parsedOrders.results);
+            setOrdersLoadedCount(parsedOrders.count);
+            setRecentOrders(parsedOrders.results.slice(0, 5));
+            setOrderSummary(
+                summaryRes ? parseOrdersSummaryResponse(summaryRes) : EMPTY_ORDER_SUMMARY
+            );
             const parsedReviews = parseReviewsListResponse(reviewsRes);
             setRecentReviews(parsedReviews.results.slice(0, 5));
             setFinanceMetrics(parseFinanceMetricsResponse(financeRes));
@@ -189,45 +249,89 @@ const Dashboard = () => {
             });
     }, [inventory]);
 
-    const topProductsData = useMemo(() => {
-        return products.slice(0, 6).map((product) => {
-            const variant = product.variants?.[0];
-            const stock = variant?.quantity ?? variant?.stock ?? 0;
-            const name = product.name || "Product";
+    const salesByProduct = useMemo(() => {
+        const rows = buildSalesByProduct(orderItems);
+        const catalogByName = new Map();
+        products.forEach((product) => {
+            if (product.name) catalogByName.set(product.name.trim().toLowerCase(), product);
+        });
+
+        return rows.map((row) => {
+            const match = catalogByName.get(row.name.trim().toLowerCase());
+            const variantWithImage = match
+                ? (match.variants || []).find((v) => getVariantCoverImageUrl(v)) || match.variants?.[0]
+                : null;
             return {
-                name: name.length > 12 ? `${name.slice(0, 10)}…` : name,
-                fullName: name,
-                stock,
+                ...row,
+                productId: match?.id || null,
+                image: row.image || getVariantCoverImageUrl(variantWithImage) || image,
             };
         });
-    }, [products]);
+    }, [orderItems, products]);
+
+    const topSellingProducts = useMemo(() => salesByProduct.slice(0, 6), [salesByProduct]);
+
+    const salesLookup = useMemo(() => {
+        const lookup = new Map();
+        salesByProduct.forEach((row) => {
+            const nameKey = row.name.trim().toLowerCase();
+            const current = lookup.get(nameKey) || { units: 0, revenue: 0 };
+            lookup.set(nameKey, {
+                units: current.units + row.units,
+                revenue: current.revenue + row.revenue,
+            });
+        });
+        return lookup;
+    }, [salesByProduct]);
+
+    const revenueTrendData = useMemo(() => {
+        return (financeMetrics?.monthly_revenue || []).map((item) => ({
+            month: item.label || `${item.month || ""} ${String(item.year || "").slice(-2)}`.trim(),
+            fullName: item.label || `${item.month || ""} ${item.year || ""}`.trim(),
+            revenue: Number(item.value ?? item.revenue) || 0,
+        }));
+    }, [financeMetrics]);
 
     const sparklines = useMemo(() => {
         const stockTrend = stockActivityData.map((d) => d.updates);
         const productTrend = categoryChartData.map((d) => d.count);
+        const revenueTrend = revenueTrendData.map((d) => d.revenue);
         return {
             products: buildSparkline(productTrend.length ? productTrend : [stats.totalProducts]),
             inventory: buildSparkline(stockTrend.length ? stockTrend : [stats.totalStockUnits]),
             pending: buildSparkline([stats.pendingCount, stats.approvedVariants, stats.pendingCount]),
             notifications: buildSparkline([stats.unreadCount, stats.unreadCount]),
+            revenue: buildSparkline(revenueTrend.length ? revenueTrend : [financeMetrics?.total_revenue?.value || 0]),
+            orders: buildSparkline([
+                orderSummary.pending,
+                orderSummary.processing,
+                orderSummary.shipped,
+                orderSummary.delivered,
+            ]),
         };
-    }, [stockActivityData, categoryChartData, stats]);
+    }, [stockActivityData, categoryChartData, revenueTrendData, stats, financeMetrics, orderSummary]);
 
     const recentProducts = useMemo(() => {
-        return products.slice(0, 12).map((product) => {
-            const variantWithImage =
-                (product.variants || []).find((v) => getVariantCoverImageUrl(v)) || product.variants?.[0];
-            const stock = variantWithImage?.quantity ?? variantWithImage?.stock ?? 0;
-            return {
-                id: product.id,
-                name: product.name,
-                price: variantWithImage?.selling_price || variantWithImage?.mrp || 0,
-                stock,
-                status: variantWithImage?.approval_status || "pending",
-                image: getVariantCoverImageUrl(variantWithImage) || image,
-            };
-        });
-    }, [products]);
+        return products
+            .map((product) => {
+                const variantWithImage =
+                    (product.variants || []).find((v) => getVariantCoverImageUrl(v)) || product.variants?.[0];
+                const stock = variantWithImage?.quantity ?? variantWithImage?.stock ?? 0;
+                const sold = salesLookup.get((product.name || "").trim().toLowerCase());
+                return {
+                    id: product.id,
+                    name: product.name,
+                    price: variantWithImage?.selling_price || variantWithImage?.mrp || 0,
+                    stock,
+                    sold: sold?.units || 0,
+                    revenue: sold?.revenue || 0,
+                    status: variantWithImage?.approval_status || "pending",
+                    image: getVariantCoverImageUrl(variantWithImage) || image,
+                };
+            })
+            .sort((a, b) => b.sold - a.sold || b.revenue - a.revenue)
+            .slice(0, 12);
+    }, [products, salesLookup]);
 
     const lowStockPanelItems = useMemo(() => {
         return stats.lowStockItems.slice(0, 5).map((item) => ({
@@ -245,7 +349,22 @@ const Dashboard = () => {
         }));
     }, [stats.pendingVariants]);
 
-    const todaySummary = `${stats.totalProducts} products · ${stats.totalVariants} variants · ${stats.totalStockUnits.toLocaleString()} units in stock`;
+    const inProgressOrders =
+        orderSummary.pending +
+        orderSummary.confirmed +
+        orderSummary.processing +
+        orderSummary.shipped;
+    const monthRevenue = financeMetrics?.this_month_revenue?.value;
+    const salesSampleNote =
+        ordersLoadedCount > orderItems.length
+            ? `Based on your latest ${orderItems.length} order lines`
+            : "Units sold from your orders";
+
+    const todaySummary = [
+        `${orderSummary.total.toLocaleString()} orders`,
+        `${stats.totalProducts} products`,
+        `${stats.totalStockUnits.toLocaleString()} units in stock`,
+    ].join(" · ");
 
     if (loading) {
         return (
@@ -314,8 +433,10 @@ const Dashboard = () => {
                         compact
                         icon={ShoppingBag}
                         label="Orders"
-                        value={recentOrders.length > 0 ? recentOrders.length : "0"}
-                        subtitle="Recent activity"
+                        value={orderSummary.total}
+                        subtitle={inProgressOrders > 0 ? `${inProgressOrders} to fulfill` : "All caught up"}
+                        trend={orderSummary.delivered > 0 ? `${orderSummary.delivered} delivered` : undefined}
+                        sparkData={sparklines.orders}
                         onAction={() => navigate("/vendor/orders")}
                         actionLabel="Orders"
                     />
@@ -325,12 +446,17 @@ const Dashboard = () => {
                         icon={IndianRupee}
                         label="Revenue"
                         value={formatCurrency(financeMetrics?.total_revenue?.value ?? 0)}
-                        subtitle="Delivered"
+                        subtitle={
+                            monthRevenue != null
+                                ? `This month ${formatCurrency(monthRevenue)}`
+                                : "Delivered"
+                        }
                         trend={
                             financeMetrics?.total_revenue?.trend_percent != null
                                 ? `${financeMetrics.total_revenue.trend_percent > 0 ? "+" : ""}${financeMetrics.total_revenue.trend_percent}%`
                                 : undefined
                         }
+                        sparkData={sparklines.revenue}
                         onAction={() => navigate("/vendor/finance")}
                         actionLabel="Finance"
                     />
@@ -377,8 +503,10 @@ const Dashboard = () => {
                             stockChartData={stockChartData}
                             categoryChartData={categoryChartData}
                             approvalChartData={approvalChartData}
-                            stockActivityData={stockActivityData}
-                            topProductsData={topProductsData}
+                            revenueTrendData={revenueTrendData}
+                            topSellingProducts={topSellingProducts}
+                            salesSampleNote={salesSampleNote}
+                            onOpenProduct={(id) => navigate(`/vendor/edit-product/${id}`)}
                         />
                         <DashboardProductsTable
                             products={recentProducts}

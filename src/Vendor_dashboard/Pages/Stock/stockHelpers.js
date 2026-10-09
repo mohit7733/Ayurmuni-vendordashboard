@@ -276,7 +276,7 @@ export function parseProductListResponse(response) {
 }
 
 /** Load the full vendor catalog so variant approval_status is complete (not just first page). */
-export async function fetchAllVendorProducts(vendorService, pageSize = 100) {
+export async function fetchAllVendorProducts(vendorService, pageSize = 100000) {
     let page = 1;
     let all = [];
     let total = Infinity;

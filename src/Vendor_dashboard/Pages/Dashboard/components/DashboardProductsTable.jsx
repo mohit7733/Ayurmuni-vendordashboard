@@ -4,8 +4,8 @@ import StatusBadge from "../../../components/shared/StatusBadge";
 
 export default function DashboardProductsTable({ products = [], onEdit, onSearch }) {
     const [search, setSearch] = useState("");
-    const [sortKey, setSortKey] = useState("name");
-    const [sortDir, setSortDir] = useState("asc");
+    const [sortKey, setSortKey] = useState("sold");
+    const [sortDir, setSortDir] = useState("desc");
 
     const filtered = useMemo(() => {
         const term = search.trim().toLowerCase();
@@ -50,7 +50,7 @@ export default function DashboardProductsTable({ products = [], onEdit, onSearch
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 border-b border-gray-100">
                 <div>
                     <h2 className="text-sm font-semibold text-gray-900">Product Overview</h2>
-                    <p className="text-[11px] text-gray-500">{filtered.length} products</p>
+                    <p className="text-[11px] text-gray-500">{filtered.length} products · sorted by sales</p>
                 </div>
                 <div className="relative max-w-xs w-full">
                     <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -73,6 +73,7 @@ export default function DashboardProductsTable({ products = [], onEdit, onSearch
                         <tr>
                             <th className="text-left px-4 py-2.5"><SortHeader label="Product" col="name" /></th>
                             <th className="text-left px-4 py-2.5"><SortHeader label="Price" col="price" /></th>
+                            <th className="text-left px-4 py-2.5"><SortHeader label="Sold" col="sold" /></th>
                             <th className="text-left px-4 py-2.5">Approval</th>
                             <th className="text-left px-4 py-2.5"><SortHeader label="Stock" col="stock" /></th>
                             <th className="text-right px-4 py-2.5 w-12"><span className="sr-only">Actions</span></th>
@@ -99,6 +100,9 @@ export default function DashboardProductsTable({ products = [], onEdit, onSearch
                                     <td className="px-4 py-2.5 text-sm text-gray-700 tabular-nums">
                                         ₹{Number(item.price).toLocaleString()}
                                     </td>
+                                    <td className="px-4 py-2.5 text-sm font-medium text-gray-800 tabular-nums">
+                                        {Number(item.sold || 0).toLocaleString()}
+                                    </td>
                                     <td className="px-4 py-2.5">
                                         <StatusBadge status={item.status} />
                                     </td>
@@ -117,7 +121,7 @@ export default function DashboardProductsTable({ products = [], onEdit, onSearch
                             ))
                         ) : (
                             <tr>
-                                <td colSpan={5} className="px-4 py-10 text-center text-sm text-gray-400">
+                                <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-400">
                                     No products match your search
                                 </td>
                             </tr>
