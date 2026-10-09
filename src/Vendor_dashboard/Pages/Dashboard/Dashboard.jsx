@@ -112,12 +112,12 @@ const Dashboard = () => {
             const notifParams = new URLSearchParams({ view: "list", page: 1, page_size: 5 });
             const [productsRes, inventoryRes, profileRes, notificationsRes, notifListRes, ordersRes, summaryRes, reviewsRes, financeRes] =
                 await Promise.all([
-                    vendorService.getProducts({ page: 1, page_size: 100 }),
-                    vendorService.getInventory({ page: 1, page_size: 100 }),
+                    vendorService.getProducts({ page: 1, page_size: 1000000 }),
+                    vendorService.getInventory({ page: 1, page_size: 1000000 }),
                     vendorService.getProfile(),
                     notificationService.get({ view: "unread_count" }),
                     notificationService.get(notifParams),
-                    vendorService.getOrders({ page: 1, page_size: 100 }).catch(() => null),
+                    vendorService.getOrders({ page: 1, page_size: 1000000 }).catch(() => null),
                     vendorService.getOrdersSummary().catch(() => null),
                     reviewService.getVendorReviews({ page: 1, page_size: 5, sort: "newest" }).catch(() => null),
                     vendorService.getFinanceMetrics({ details_limit: 5 }).catch(() => null),
