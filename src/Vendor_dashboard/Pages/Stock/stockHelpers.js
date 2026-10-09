@@ -1,7 +1,6 @@
 import {
     canUpdateVariantQuantity,
     getVariantCoverImageUrl,
-    isVariantApproved,
 } from "../../../utils/unicommerceHelpers";
 
 /**
@@ -26,7 +25,57 @@ export const STOCK_FILTERS = [
     { key: "low-stock", label: "Low stock" },
     { key: "out-of-stock", label: "Out of stock" },
     { key: "pending", label: "Pending approval" },
+    { key: "approved", label: "Approved" },
 ];
+
+/** Inventory list `filter` query values. "all" omits the param. */
+export const UI_TO_API_STOCK_FILTER = {
+    instock: "in_stock",
+    "low-stock": "low_stock",
+    "out-of-stock": "out_of_stock",
+    pending: "pending_approval",
+    approved: "approved",
+};
+
+export const INVENTORY_MAX_PAGE_SIZE = 100;
+
+export const EMPTY_INVENTORY_SUMMARY = {
+    low_stock: 0,
+    out_of_stock: 0,
+    pending_approval: 0,
+    approved: 0,
+    total_value: 0,
+};
+
+export const EMPTY_INVENTORY_FILTERS = {
+    in_stock: 0,
+    low_stock: 0,
+    out_of_stock: 0,
+    pending_approval: 0,
+    approved: 0,
+};
+
+export function toApiStockFilter(uiKey) {
+    if (!uiKey || uiKey === "all") return undefined;
+    return UI_TO_API_STOCK_FILTER[uiKey];
+}
+
+export function clampInventoryPageSize(pageSize) {
+    const size = Number(pageSize) || 10;
+    return Math.min(Math.max(1, size), INVENTORY_MAX_PAGE_SIZE);
+}
+
+/** Tab badges from the inventory `filters` object. `totalRecords` is the unfiltered list count. */
+export function buildApiFilterCounts(filters = {}, totalRecords = 0) {
+    return {
+        all: Number(totalRecords) || 0,
+        instock: Number(filters.in_stock) || 0,
+        "low-stock": Number(filters.low_stock) || 0,
+        "out-of-stock": Number(filters.out_of_stock) || 0,
+        pending: Number(filters.pending_approval) || 0,
+        approved: Number(filters.approved) || 0,
+    };
+}
 
 export const KPI_FILTER_MAP = {
     records: "all",
@@ -224,34 +273,6 @@ export const STOCK_HEALTH_LABELS = {
     locked: "Locked",
 };
 
-export function computeInventorySummary(items = []) {
-    return {
-        totalRecords: items.length,
-        totalUnits: items.reduce((sum, item) => sum + (item.quantity || 0), 0),
-        lowStock: items.filter((item) => item.quantity > 0 && item.quantity <= LOW_STOCK_THRESHOLD).length,
-        outOfStock: items.filter((item) => item.quantity <= 0).length,
-        pendingApproval: items.filter((item) => !isVariantApproved(item)).length,
-    };
-}
-
-export function computeFilterCounts(items = []) {
-    const counts = { all: items.length, instock: 0, "low-stock": 0, "out-of-stock": 0, pending: 0 };
-    items.forEach((item) => {
-        const health = getStockHealthKey(item.quantity || 0);
-        if (health === "instock") counts.instock += 1;
-        if (health === "low-stock") counts["low-stock"] += 1;
-        if (health === "out-of-stock") counts["out-of-stock"] += 1;
-        if (!isVariantApproved(item)) counts.pending += 1;
-    });
-    return counts;
-}
-
-export function filterInventoryItems(items, stockFilter) {
-    if (stockFilter === "all") return items;
-    if (stockFilter === "pending") return items.filter((item) => !isVariantApproved(item));
-    return items.filter((item) => getStockHealthKey(item.quantity || 0) === stockFilter);
-}
-
 export function formatDateTime(value) {
     if (!value) return { date: "—", time: "" };
     const parsed = new Date(value);
@@ -262,10 +283,12 @@ export function formatDateTime(value) {
 }
 
 export function parseInventoryListResponse(response) {
-    const data = response?.data?.data;
+    const data = response?.data?.data || {};
     return {
-        results: data?.results || [],
-        count: data?.count || 0,
+        results: Array.isArray(data.results) ? data.results : [],
+        count: Number(data.count) || 0,
+        summary: { ...EMPTY_INVENTORY_SUMMARY, ...(data.summary || {}) },
+        filters: { ...EMPTY_INVENTORY_FILTERS, ...(data.filters || {}) },
     };
 }
 
