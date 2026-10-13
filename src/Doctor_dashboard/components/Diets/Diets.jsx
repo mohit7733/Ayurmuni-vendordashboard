@@ -19,6 +19,7 @@ import {
     Inbox,
     Upload,
     SearchIcon,
+    X,
 } from 'lucide-react';
 import { doctorService } from '../../../services/doctorService';
 import { Link } from 'react-router-dom';
@@ -67,10 +68,11 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
     const [prevUrl, setPrevUrl] = useState(null);
 
     const [search, setSearch] = useState('');
+    const [searchInput, setSearchInput] = useState(''); 
     const [seasonFilter, setSeasonFilter] = useState('all');
     const [typeFilter, setTypeFilter] = useState('all'); // all | paid | free
     const [visibilityFilter, setVisibilityFilter] = useState('all'); // all | common | personal
-
+    const [statusFilter, setStatusFilter] = useState('all'); // all | active | inactive
     const [activeMap, setActiveMap] = useState({});
     const [togglingId, setTogglingId] = useState(null);
     const [deletingId, setDeletingId] = useState(null);
@@ -98,7 +100,9 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
                 search: search.trim(),
                 season: seasonFilter === 'all' ? null : seasonFilter?.toLowerCase(),
                 is_paid: typeFilter === 'all' ? null : typeFilter !== 'free' ? true : false,
-                is_common: visibilityFilter === 'all' ? null : visibilityFilter === 'common'
+                is_common: visibilityFilter === 'all' ? null : visibilityFilter === 'common',
+                is_active: statusFilter === 'all' ? null : statusFilter === 'active',
+
             });
 
 
@@ -122,11 +126,25 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
         } finally {
             setLoading(false);
         }
-    }, [search, seasonFilter, typeFilter, visibilityFilter]);
+    }, [search, seasonFilter, typeFilter, visibilityFilter,statusFilter]);
 
     useEffect(() => {
         fetchPlans();
     }, [fetchPlans]);
+     const handleSearch = (e) => {
+        e?.preventDefault();
+        const query = searchInput.trim();
+        if (query === search) {
+            fetchPlans();          
+        } else {
+            setSearch(query);      
+        }
+    };
+
+    const handleClear = () => {
+        setSearchInput('');
+        if (search !== '') setSearch('');
+    };
 
     const toggleActive = async (id, isActive) => {
         setTogglingId(id);
@@ -174,7 +192,7 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
         return true;
     });
 
-    const seasons = ['summer', 'winter', 'spring', 'autumn', 'monsoon', 'all_seasons'];
+    const seasons = ['summer', 'winter', 'spring', 'autumn', 'monsoon'];
 
     return (
         <div className="max-w-8xl mx-auto p-4 min-h-screen">
@@ -214,22 +232,43 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
 
             {/* Toolbar */}
             <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-3.5 mb-4 flex  items-center gap-2.5">
-                <div className="relative flex-1 min-w-0 w-full sm:min-w-[220px]">
-                    <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                        type="text"
-                        defaultValue={search}
-                        onBlur={(e) => {
-                            setSearch(e.target.value)
-                        }}
-                        placeholder="Search by name or condition…"
-                        className="w-full min-w-0 px-8"
-                    />
-                </div>
+                    <form
+                    onSubmit={handleSearch}
+                    className="flex flex-1 min-w-0 w-full sm:min-w-[220px] gap-2"
+                >
+                    <div className="relative flex-1 min-w-0">
+                        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                            type="text"
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            placeholder="Search by name or condition…"
+                            className="w-full min-w-0 px-8"
+                        />
+                        {searchInput && (
+                            <button
+                                type="button"
+                                onClick={handleClear}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="px-4 py-4 text-sm font-medium text-white bg-[#0D614E] rounded-lg hover:bg-[#0A4D3D] disabled:opacity-50"
+                    >
+                        Search
+                    </button>
+                </form>
 
                 <select
                     value={seasonFilter}
                     onChange={(e) => setSeasonFilter(e.target.value)}
+                    className="w-[130px] shrink-0 px-4 py-4 text-sm border border-gray-200 rounded-lg focus:outline-none"
+
                 >
                     <option value="all">All seasons</option>
                     {seasons.map((s) => (
@@ -242,6 +281,8 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
                 <select
                     value={typeFilter}
                     onChange={(e) => setTypeFilter(e.target.value)}
+                    className="w-[130px] shrink-0 px-4 py-4 text-sm border border-gray-200 rounded-lg focus:outline-none"
+
                 >
                     <option value="all">Paid & Free</option>
                     <option value="paid">Paid only</option>
@@ -251,12 +292,24 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
                 <select
                     value={visibilityFilter}
                     onChange={(e) => setVisibilityFilter(e.target.value)}
+                    className="w-[180px] shrink-0 px-4 py-4 text-sm border border-gray-200 rounded-lg focus:outline-none"
                 >
                     <option value="all">Common & Personal</option>
                     <option value="common">Common only</option>
                     <option value="personal">Personal only</option>
                 </select>
+                                
+                <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-[130px] shrink-0 px-4 py-4 text-sm border border-gray-200 rounded-lg focus:outline-none"
+                >
+                    <option value="all">All status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
             </div>
+            
 
             {/* Table */}
             <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
