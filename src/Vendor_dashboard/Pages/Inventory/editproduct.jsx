@@ -876,14 +876,15 @@ export default function EditProduct() {
             const value = current[key];
             const oldValue = original?.[key];
 
-            if (
-                value === "" ||
-                value === null ||
-                value === undefined ||
-                (Array.isArray(value) && value.length === 0)
-            ) {
-                return;
-            }
+            // if (
+            //     value == "" ||
+            //     value === null ||
+            //     value === undefined ||
+            //     (Array.isArray(value) && value.length === 0)
+            // ) {
+            //     // result[key] = value;
+            //     return;
+            // }
 
             if (
                 typeof value === "object" &&
@@ -1204,6 +1205,18 @@ export default function EditProduct() {
                                             name="side_effects"
                                             placeholder="Possible side effects"
                                             value={formData.side_effects}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Dosage</label>
+                                        <input
+                                            type="text"
+                                            name="dosages"
+                                            placeholder=""
+                                            value={formData.dosages}
                                             onChange={handleInputChange}
                                         />
                                     </div>
