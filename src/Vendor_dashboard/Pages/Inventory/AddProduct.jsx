@@ -1130,6 +1130,18 @@ export default function AddProduct() {
                     />
                   </div>
                 </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Dosage</label>
+                    <input
+                      type="text"
+                      name="dosages"
+                      placeholder=""
+                      value={formData.dosages}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Health Concern Section */}
