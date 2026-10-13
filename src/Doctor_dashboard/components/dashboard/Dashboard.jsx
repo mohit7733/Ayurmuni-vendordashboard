@@ -15,6 +15,7 @@ import {
     Menu,
     User,
     ChevronDown,
+    ChevronUp,
     Star,
     Video,
     Phone,
@@ -123,6 +124,7 @@ const DoctorDashboard = () => {
         try {
             setIsLoading(true);
             const res = await doctorService.dashboardget();
+            // console.log("Dashboard API Response:", res.data);
             const folloup = await doctorService.dashboardfolloupadata();
 
             if (res?.data?.success) {
@@ -317,6 +319,10 @@ const DoctorDashboard = () => {
         Kapha: ['Light, warm foods', 'Regular exercise', 'Dry brushing', 'Honey in warm water']
     };
 
+    // raman
+    const [showAllReviews, setShowAllReviews] = useState(false);
+    const [collapsedReviews, setCollapsedReviews] = useState({});
+    // raman
     useEffect(() => {
         fetchDashboardData();
     }, []);
@@ -678,7 +684,8 @@ const DoctorDashboard = () => {
                                                             {patient.profile_picture ? (
                                                                 <img src={patient.profile_picture} alt={patient.patient_name} className="w-8 h-8 rounded-full object-cover" />
                                                             ) : (
-                                                                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-sm font-semibold">
+                                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0D614E] to-[#0a4d3e] text-white
+                                                                 flex items-center justify-center text-sm font-semibold">
                                                                     {patient.first_name?.charAt(0) || patient.patient_name?.charAt(0)}
                                                                 </div>
                                                             )}
@@ -872,22 +879,50 @@ const DoctorDashboard = () => {
                                 {dashboardData.ratings.recent_reviews
                                     ?.slice(0, 3)
                                     .map((review) => (
+                                        // Raman
                                         <div
                                             key={review.id}
                                             className="border rounded-xl p-4 hover:shadow-sm transition"
                                         >
                                             <div className="flex items-start gap-3">
-                                                <img
-                                                    src={review.reviewer_profile_image}
-                                                    alt={review.reviewer_name}
-                                                    className="w-11 h-11 rounded-full object-cover border"
-                                                />
+
+                                                {/* Profile Image / Initials */}
+                                                {review.reviewer_profile_image ? (
+                                                    <img
+                                                        src={review.reviewer_profile_image}
+                                                        alt={review.reviewer_name}
+                                                        className="w-11 h-11 rounded-full object-cover border"
+                                                    />
+                                                ) : (
+                                                    <div className="w-11 h-11 rounded-full border border-[#0D614E]/20 flex items-center justify-center bg-gradient-to-br from-[#0D614E] to-[#0a4d3e] text-white font-semibold">
+                                                        {(() => {
+                                                            const nameParts =
+                                                                review.reviewer_name
+                                                                    ?.trim()
+                                                                    .split(/\s+/)
+                                                                    .filter(Boolean) || [];
+
+                                                            if (nameParts.length === 1) {
+                                                                return nameParts[0][0]?.toUpperCase();
+                                                            }
+
+                                                            return (
+                                                                nameParts[0][0]?.toUpperCase() +
+                                                                nameParts[nameParts.length - 1][0]?.toUpperCase()
+                                                            );
+                                                        })()}
+                                                    </div>
+                                                )}
+
                                                 <div className="flex-1">
-                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+
+                                                    {/* Header */}
+                                                    <div className="flex items-center justify-between gap-2">
                                                         <div>
                                                             <h4 className="font-semibold text-gray-900">
                                                                 {review.reviewer_name}
                                                             </h4>
+
                                                             <div className="flex items-center gap-1 mt-1">
                                                                 {[1, 2, 3, 4, 5].map((star) => (
                                                                     <Star
@@ -902,43 +937,70 @@ const DoctorDashboard = () => {
                                                                 ))}
                                                             </div>
                                                         </div>
-                                                        <span className="text-xs text-gray-400">
-                                                            {formatDate(review.created_at)}
-                                                        </span>
+
+                                                        {/* Collapse / Expand Button */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setCollapsedReviews((prev) => ({
+                                                                    ...prev,
+                                                                    [review.id]: !prev[review.id],
+                                                                }))
+                                                            }
+                                                            className="p-2 rounded-lg hover:bg-gray-100 transition"
+                                                        >
+                                                            {collapsedReviews[review.id] ? (
+                                                                <ChevronDown size={18} className="text-gray-500" />
+                                                            ) : (
+                                                                <ChevronUp size={18} className="text-gray-500" />
+                                                            )}
+                                                        </button>
                                                     </div>
-                                                    {review.review && (
-                                                        <p className="mt-3 text-sm text-gray-600 leading-6">
-                                                            {review.review}
-                                                        </p>
-                                                    )}
-                                                    {review.image_urls?.length > 0 && (
-                                                        <div className="flex gap-2 mt-3">
-                                                            {review.image_urls.map((img, index) => (
-                                                                <img
-                                                                    key={index}
-                                                                    src={img}
-                                                                    alt=""
-                                                                    className="w-16 h-16 rounded-lg object-cover border cursor-pointer hover:scale-105 transition"
-                                                                />
-                                                            ))}
-                                                        </div>
-                                                    )}
 
-                                                    {review.doctor_reply && (
-                                                        <div className="mt-4 rounded-xl bg-[#0D614E]/5 border border-[#0D614E]/20 p-3">
-                                                            <p className="text-xs font-semibold text-[#0D614E] mb-1">
-                                                                Doctor Reply
-                                                            </p>
+                                                    {/* Date */}
+                                                    <span className="text-xs text-gray-400">
+                                                        {formatDate(review.created_at)}
+                                                    </span>
 
-                                                            <p className="text-sm text-gray-700">
-                                                                {review.doctor_reply}
-                                                            </p>
-                                                        </div>
+                                                    {/* Collapsible Content */}
+                                                    {!collapsedReviews[review.id] && (
+                                                        <>
+                                                            {review.review && (
+                                                                <p className="mt-3 text-sm text-gray-600 leading-6">
+                                                                    {review.review}
+                                                                </p>
+                                                            )}
+
+                                                            {review.image_urls?.length > 0 && (
+                                                                <div className="flex gap-2 mt-3">
+                                                                    {review.image_urls.map((img, index) => (
+                                                                        <img
+                                                                            key={index}
+                                                                            src={img}
+                                                                            alt=""
+                                                                            className="w-16 h-16 rounded-lg object-cover border cursor-pointer hover:scale-105 transition"
+                                                                        />
+                                                                    ))}
+                                                                </div>
+                                                            )}
+
+                                                            {review.doctor_reply && (
+                                                                <div className="mt-4 rounded-xl bg-[#0D614E]/5 border border-[#0D614E]/20 p-3">
+                                                                    <p className="text-xs font-semibold text-[#0D614E] mb-1">
+                                                                        Doctor Reply
+                                                                    </p>
+
+                                                                    <p className="text-sm text-gray-700">
+                                                                        {review.doctor_reply}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </>
                                                     )}
-
                                                 </div>
                                             </div>
                                         </div>
+                                        // raman
                                     ))}
                             </div>
 
