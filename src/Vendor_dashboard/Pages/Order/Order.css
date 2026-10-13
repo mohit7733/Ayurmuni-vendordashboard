@@ -449,6 +449,41 @@
     box-shadow: 0 0 0 3px rgba(13, 97, 78, 0.12);
 }
 
+.order-fulfillment-step.is-alert .order-fulfillment-dot {
+    border-color: #dc2626;
+    background: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+}
+
+.order-fulfillment-step.is-alert .order-fulfillment-title {
+    color: #dc2626;
+}
+
+.order-fulfillment-current {
+    margin-left: 0.5rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: #ecfdf5;
+    color: #0d614e;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.order-fulfillment-step.is-alert .order-fulfillment-current {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.order-fulfillment-note {
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: #6b7280;
+}
+
 .order-fulfillment-title {
     font-size: 0.875rem;
     font-weight: 600;

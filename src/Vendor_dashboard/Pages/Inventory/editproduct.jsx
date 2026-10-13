@@ -188,8 +188,8 @@ export default function EditProduct() {
                     } : null),
                     vendor_price:
                         variant.vendor_price !== undefined &&
-                        variant.vendor_price !== null &&
-                        variant.vendor_price !== ""
+                            variant.vendor_price !== null &&
+                            variant.vendor_price !== ""
                             ? variant.vendor_price
                             : calculateVendorPrice(variant),
                 })
@@ -784,8 +784,8 @@ export default function EditProduct() {
             calculation_mode: variant.calculation_mode || (priceType == "TP" ? "trade_price" : "selling_price"),
             vendor_price:
                 variant.vendor_price !== undefined &&
-                variant.vendor_price !== null &&
-                variant.vendor_price !== ""
+                    variant.vendor_price !== null &&
+                    variant.vendor_price !== ""
                     ? variant.vendor_price
                     : calculateVendorPrice(variant),
             taxes: variant.taxes || [
@@ -876,14 +876,15 @@ export default function EditProduct() {
             const value = current[key];
             const oldValue = original?.[key];
 
-            if (
-                value === "" ||
-                value === null ||
-                value === undefined ||
-                (Array.isArray(value) && value.length === 0)
-            ) {
-                return;
-            }
+            // if (
+            //     value == "" ||
+            //     value === null ||
+            //     value === undefined ||
+            //     (Array.isArray(value) && value.length === 0)
+            // ) {
+            //     // result[key] = value;
+            //     return;
+            // }
 
             if (
                 typeof value === "object" &&
@@ -1060,8 +1061,8 @@ export default function EditProduct() {
                                                         type="button"
                                                         key={category}
                                                         className={`service-category-pill ${selectedServiceCategory.toLowerCase() === category.toLowerCase()
-                                                                ? "active"
-                                                                : ""
+                                                            ? "active"
+                                                            : ""
                                                             }`}
                                                         onClick={() => handleServiceCategorySelect(category)}
                                                     >
@@ -1204,6 +1205,18 @@ export default function EditProduct() {
                                             name="side_effects"
                                             placeholder="Possible side effects"
                                             value={formData.side_effects}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Dosage</label>
+                                        <input
+                                            type="text"
+                                            name="dosages"
+                                            placeholder=""
+                                            value={formData.dosages}
                                             onChange={handleInputChange}
                                         />
                                     </div>
@@ -1574,15 +1587,44 @@ export default function EditProduct() {
                                         <select name="physical_state" value={variantForm.physical_state} onChange={handleVariantInputChange}>
                                             <option value="">Select Type</option>
                                             {[
-                                                { value: "tablet", label: "Tablet" },
                                                 { value: "capsule", label: "Capsule" },
-                                                { value: "powder", label: "Powder" },
-                                                { value: "syrup", label: "Syrup" },
-                                                { value: "oil", label: "Oil" },
                                                 { value: "cream", label: "Cream" },
-                                                { value: "gel", label: "Gel" },
                                                 { value: "drops", label: "Drops" },
+                                                { value: "gas", label: "Gas" },
+                                                { value: "gel", label: "Gel" },
                                                 { value: "juice", label: "Juice" },
+                                                { value: "liquid", label: "Liquid" },
+                                                { value: "oil", label: "Oil" },
+                                                { value: "powder", label: "Powder" },
+                                                { value: "solid", label: "Solid" },
+                                                { value: "tablet", label: "Tablet" },
+                                                { value: "syrup", label: "Syrup" },
+                                                { value: "ointment", label: "Ointment" },
+                                                { value: "paste", label: "Paste" },
+                                                { value: "semi_solid", label: "Semi-Solid" },
+                                                { value: "lotion", label: "Lotion" },
+                                                { value: "balm", label: "Balm" },
+                                                { value: "spray", label: "Spray" },
+                                                { value: "foam", label: "Foam" },
+                                                { value: "granules", label: "Granules" },
+                                                { value: "lozenges", label: "Lozenges" },
+                                                { value: "chewable", label: "Chewable" },
+                                                { value: "effervescent", label: "Effervescent" },
+                                                { value: "sachet", label: "Sachet" },
+                                                { value: "extract", label: "Extract" },
+                                                { value: "tincture", label: "Tincture" },
+                                                { value: "decoction", label: "Decoction" },
+                                                { value: "resin", label: "Resin" },
+                                                { value: "wax", label: "Wax" },
+                                                { value: "suppository", label: "Suppository" },
+                                                { value: "pessary", label: "Pessary" },
+                                                { value: "patch", label: "Patch" },
+                                                { value: "inhaler", label: "Inhaler" },
+                                                { value: "shampoo", label: "Shampoo" },
+                                                { value: "soap", label: "Soap" },
+                                                { value: "toothpaste", label: "Toothpaste" },
+                                                { value: "mouthwash", label: "Mouthwash" },
+                                                { value: "serum", label: "Serum" },
                                                 { value: "other", label: "Other" }
                                             ].map((data) => (
                                                 <option key={data.value} value={data.value}>{data.label}</option>

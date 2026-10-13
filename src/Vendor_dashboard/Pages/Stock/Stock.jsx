@@ -2,14 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from "react"
 import toast from "react-hot-toast";
 import {
     AlertTriangle,
-    Boxes,
     Cloud,
     CloudOff,
+    IndianRupee,
     Lock,
     Package,
     Pencil,
     RefreshCw,
-    Trash2,
     TrendingDown,
     Warehouse,
 } from "lucide-react";
@@ -25,6 +24,7 @@ import Modal from "../../components/shared/Modal";
 import Button from "../../components/shared/Button";
 import DataTable, { TableRow, TableCell } from "../../components/shared/DataTable";
 import PremiumKPICard from "../Dashboard/components/PremiumKPICard";
+import { formatCurrency } from "../Order/orderHelpers";
 import Ayurvedaimage from "../../../Assests/Ayurvedaimage.png";
 import {
     extractApiErrorMessage,
@@ -38,9 +38,11 @@ import {
     LOW_STOCK_THRESHOLD,
     STOCK_FILTERS,
     KPI_FILTER_MAP,
-    computeInventorySummary,
-    computeFilterCounts,
-    filterInventoryItems,
+    EMPTY_INVENTORY_SUMMARY,
+    EMPTY_INVENTORY_FILTERS,
+    buildApiFilterCounts,
+    toApiStockFilter,
+    clampInventoryPageSize,
     formatDateTime,
     getStockHealthKey,
     STOCK_HEALTH_LABELS,
@@ -104,10 +106,14 @@ function QuantityUnavailableModal({ item, open, onClose, onViewProduct }) {
     );
 }
 
-function StockKpiSection({ summary, listTotalCount, summaryLoading, hasActiveQuery, onFilterSelect }) {
+function StockKpiSection({ summary, recordCount, summaryLoading, hasActiveQuery, onFilterSelect }) {
     if (summaryLoading) {
         return <MetricSkeleton count={5} />;
     }
+
+    const lowStock = Number(summary.low_stock) || 0;
+    const outOfStock = Number(summary.out_of_stock) || 0;
+    const pendingApproval = Number(summary.pending_approval) || 0;
 
     return (
         <div className="stock-kpi-grid ds-stagger">
@@ -115,51 +121,51 @@ function StockKpiSection({ summary, listTotalCount, summaryLoading, hasActiveQue
                 variant="hero"
                 icon={Warehouse}
                 label={hasActiveQuery ? "Matching records" : "Inventory records"}
-                value={listTotalCount}
-                subtitle={hasActiveQuery ? "Current search / filter" : "Total in your catalog"}
+                value={recordCount}
+                subtitle={hasActiveQuery ? "Current search / product" : "Total in your catalog"}
                 className="stock-kpi-clickable"
                 onAction={() => onFilterSelect("all")}
                 actionLabel="View all"
             />
             <PremiumKPICard
                 variant="soft"
-                icon={Boxes}
-                label="Total units"
-                value={summary.totalUnits}
-                subtitle="On-hand quantity"
+                icon={IndianRupee}
+                label="Inventory value"
+                value={formatCurrency(summary.total_value)}
+                subtitle="From inventory summary"
             />
             <PremiumKPICard
-                variant={summary.lowStock > 0 ? "alert" : "soft"}
+                variant={lowStock > 0 ? "alert" : "soft"}
                 icon={TrendingDown}
                 label="Low stock"
-                value={summary.lowStock}
+                value={lowStock}
                 subtitle={`≤ ${LOW_STOCK_THRESHOLD} units`}
-                trend={summary.lowStock > 0 ? "Needs attention" : "Healthy levels"}
-                trendDirection={summary.lowStock > 0 ? "down" : "up"}
+                trend={lowStock > 0 ? "Needs attention" : "Healthy levels"}
+                trendDirection={lowStock > 0 ? "down" : "up"}
                 className="stock-kpi-clickable"
-                onAction={summary.lowStock > 0 ? () => onFilterSelect("low-stock") : undefined}
+                onAction={lowStock > 0 ? () => onFilterSelect("low-stock") : undefined}
                 actionLabel="Review"
             />
             <PremiumKPICard
-                variant={summary.outOfStock > 0 ? "alert" : "muted"}
+                variant={outOfStock > 0 ? "alert" : "muted"}
                 icon={AlertTriangle}
                 label="Out of stock"
-                value={summary.outOfStock}
+                value={outOfStock}
                 subtitle="Zero units on hand"
-                trend={summary.outOfStock > 0 ? "Restock needed" : "None flagged"}
-                trendDirection={summary.outOfStock > 0 ? "down" : "up"}
+                trend={outOfStock > 0 ? "Restock needed" : "None flagged"}
+                trendDirection={outOfStock > 0 ? "down" : "up"}
                 className="stock-kpi-clickable"
-                onAction={summary.outOfStock > 0 ? () => onFilterSelect("out-of-stock") : undefined}
+                onAction={outOfStock > 0 ? () => onFilterSelect("out-of-stock") : undefined}
                 actionLabel="Review"
             />
             <PremiumKPICard
                 variant="accent"
                 icon={Package}
                 label="Pending approval"
-                value={summary.pendingApproval}
+                value={pendingApproval}
                 subtitle="Updates locked until approved"
                 className="stock-kpi-clickable"
-                onAction={summary.pendingApproval > 0 ? () => onFilterSelect("pending") : undefined}
+                onAction={pendingApproval > 0 ? () => onFilterSelect("pending") : undefined}
                 actionLabel="Review"
             />
         </div>
@@ -217,9 +223,7 @@ function StockTableRow({ item, onEdit, onDelete, onBlocked }) {
             </TableCell>
             <TableCell>
                 <div className="stock-row-actions" onClick={(e) => e.stopPropagation()}>
-                    {console.log(item)                    }
-                    {
-                        item?.status === "inactive" ? (
+                    {item?.status === "inactive" ? (
                             <Button
                                 variant="ghost"
                                 className="!px-2.5 !py-1.5 !text-xs !text-gray-500 !border-gray-300 hover:!bg-gray-50"
@@ -268,7 +272,9 @@ export default function StockManagement() {
     const navigate = useNavigate();
     const [items, setItems] = useState([]);
     const [products, setProducts] = useState([]);
-    const [summaryItems, setSummaryItems] = useState([]);
+    const [apiSummary, setApiSummary] = useState(EMPTY_INVENTORY_SUMMARY);
+    const [apiFilters, setApiFilters] = useState(EMPTY_INVENTORY_FILTERS);
+    const [catalogCount, setCatalogCount] = useState(0);
     const [loading, setLoading] = useState(true);
     const [summaryLoading, setSummaryLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -291,6 +297,8 @@ export default function StockManagement() {
     const productsCache = useRef(null);
     const productsPromiseRef = useRef(null);
     const fetchTimeoutRef = useRef(null);
+    const inventoryRequestRef = useRef(0);
+    const countsRequestRef = useRef(0);
 
     const hasActiveQuery = Boolean(search || productFilter);
 
@@ -330,158 +338,102 @@ export default function StockManagement() {
         return enrichInventoryWithApproval(results, productList, vendorService, options);
     }, []);
 
-    const fetchAllData = useCallback(
-        async (options = {}) => {
-            const { skipInventory = false, skipSummary = false, forceRefresh = false } = options;
-
-            try {
-                const productList = await fetchProducts(forceRefresh);
-                const promises = [];
-
-                if (!skipInventory) {
-                    promises.push(
-                        (async () => {
-                            try {
-                                const inventoryRes = await vendorService.getInventory({
-                                    page,
-                                    page_size: pageSize,
-                                    search: search || undefined,
-                                    product_id: productFilter || undefined,
-                                });
-                                const { results, count } = parseInventoryListResponse(inventoryRes);
-                                const enrichedItems = await enrichRows(results, productList, {
-                                    verifyLive: true,
-                                });
-                                return { items: enrichedItems, count };
-                            } catch (err) {
-                                const status = err?.response?.status;
-                                const message =
-                                    err?.response?.data?.message || err.message || "Failed to load stock";
-                                setError(
-                                    status === 403
-                                        ? message ||
-                                        "Your vendor account must be approved before managing inventory."
-                                        : message
-                                );
-                                throw err;
-                            }
-                        })()
-                    );
-                }
-
-                if (!skipSummary) {
-                    promises.push(
-                        (async () => {
-                            try {
-                                setSummaryLoading(true);
-                                const response = await vendorService.getInventory({ page_size: 500 });
-                                const { results } = parseInventoryListResponse(response);
-                                const enrichedSummary = await enrichRows(results, productList);
-                                return enrichedSummary;
-                            } catch (error) {
-                                console.error("Failed to fetch summary:", error);
-                                return [];
-                            } finally {
-                                setSummaryLoading(false);
-                            }
-                        })()
-                    );
-                }
-
-                const results = await Promise.allSettled(promises);
-
-                let inventoryResult = null;
-                let summaryResult = null;
-
-                results.forEach((result, index) => {
-                    if (result.status === "fulfilled") {
-                        if (!skipInventory && index === 0) {
-                            inventoryResult = result.value;
-                        } else if (!skipSummary && (skipInventory ? index === 0 : index === 1)) {
-                            summaryResult = result.value;
-                        }
-                    }
-                });
-
-                if (inventoryResult) {
-                    setItems(inventoryResult.items);
-                    setTotalCount(inventoryResult.count);
-                }
-
-                if (summaryResult) {
-                    setSummaryItems(summaryResult);
-                }
-
-                return { inventory: inventoryResult, summary: summaryResult };
-            } catch (error) {
-                console.error("Failed to fetch all data:", error);
-                throw error;
-            }
-        },
-        [page, pageSize, search, productFilter, fetchProducts, enrichRows]
+    const listQuery = useMemo(
+        () => ({
+            search: search || undefined,
+            product_id: productFilter || undefined,
+        }),
+        [search, productFilter]
     );
 
+    const fetchCounts = useCallback(async () => {
+        const requestId = ++countsRequestRef.current;
+        setSummaryLoading(true);
+        try {
+            const response = await vendorService.getInventory({
+                page: 1,
+                page_size: 1,
+                ...listQuery,
+            });
+            if (requestId !== countsRequestRef.current) return;
+            const parsed = parseInventoryListResponse(response);
+            setApiSummary(parsed.summary);
+            setApiFilters(parsed.filters);
+            setCatalogCount(parsed.count);
+        } catch (err) {
+            if (requestId !== countsRequestRef.current) return;
+            console.error("Failed to fetch inventory counts:", err);
+        } finally {
+            if (requestId === countsRequestRef.current) {
+                setSummaryLoading(false);
+            }
+        }
+    }, [listQuery]);
+
     const fetchInventory = useCallback(async () => {
+        const requestId = ++inventoryRequestRef.current;
         setLoading(true);
         setError("");
         try {
-            await fetchAllData({ skipSummary: true });
-        } catch (error) {
-            console.error("Failed to fetch inventory:", error);
-        } finally {
-            setLoading(false);
-        }
-    }, [fetchAllData]);
-
-    const fetchSummary = useCallback(async () => {
-        try {
             const productList = await fetchProducts();
-            setSummaryLoading(true);
-            const response = await vendorService.getInventory({ page_size: 500 });
-            const { results } = parseInventoryListResponse(response);
-            const enrichedSummary = await enrichRows(results, productList);
-            setSummaryItems(enrichedSummary);
-        } catch (error) {
-            console.error("Failed to fetch summary:", error);
-            setSummaryItems([]);
+            const inventoryRes = await vendorService.getInventory({
+                page,
+                page_size: clampInventoryPageSize(pageSize),
+                ...listQuery,
+                filter: toApiStockFilter(stockFilter),
+            });
+            if (requestId !== inventoryRequestRef.current) return;
+            const { results, count } = parseInventoryListResponse(inventoryRes);
+            const enrichedItems = await enrichRows(results, productList, { verifyLive: true });
+            if (requestId !== inventoryRequestRef.current) return;
+            setItems(enrichedItems);
+            setTotalCount(count);
+        } catch (err) {
+            if (requestId !== inventoryRequestRef.current) return;
+            const status = err?.response?.status;
+            const message = err?.response?.data?.message || err.message || "Failed to load stock";
+            setError(
+                status === 403
+                    ? message || "Your vendor account must be approved before managing inventory."
+                    : message
+            );
+            setItems([]);
+            setTotalCount(0);
         } finally {
-            setSummaryLoading(false);
+            if (requestId === inventoryRequestRef.current) {
+                setLoading(false);
+            }
         }
-    }, [fetchProducts, enrichRows]);
+    }, [page, pageSize, listQuery, stockFilter, fetchProducts, enrichRows]);
 
     const reloadAll = useCallback(
         async (forceRefresh = false) => {
-            setLoading(true);
             setRefreshing(true);
             setError("");
             try {
-                await fetchAllData({ forceRefresh, skipSummary: false, skipInventory: false });
-            } catch (error) {
-                console.error("Failed to reload all data:", error);
+                await fetchProducts(forceRefresh);
+                await Promise.all([fetchInventory(), fetchCounts()]);
+            } catch (err) {
+                console.error("Failed to reload stock:", err);
             } finally {
-                setLoading(false);
                 setRefreshing(false);
             }
         },
-        [fetchAllData]
+        [fetchProducts, fetchInventory, fetchCounts]
     );
 
     useEffect(() => {
         let mounted = true;
 
         const initialLoad = async () => {
-            if (!mounted) return;
-
             try {
                 await fetchProducts();
-                if (mounted) {
-                    await fetchSummary();
-                }
             } catch (error) {
                 console.error("Initial load failed:", error);
                 if (mounted) {
                     setError("Failed to load initial data");
                     setLoading(false);
+                    setSummaryLoading(false);
                 }
             }
         };
@@ -494,26 +446,31 @@ export default function StockManagement() {
                 clearTimeout(fetchTimeoutRef.current);
             }
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [fetchProducts]);
 
     useEffect(() => {
+        if (!productsLoaded) return undefined;
+        fetchCounts();
+        return undefined;
+    }, [productsLoaded, fetchCounts]);
+
+    useEffect(() => {
+        if (!productsLoaded) return undefined;
+
         if (fetchTimeoutRef.current) {
             clearTimeout(fetchTimeoutRef.current);
         }
 
-        if (productsLoaded) {
-            fetchTimeoutRef.current = setTimeout(() => {
-                fetchInventory();
-            }, 300);
-        }
+        fetchTimeoutRef.current = setTimeout(() => {
+            fetchInventory();
+        }, 300);
 
         return () => {
             if (fetchTimeoutRef.current) {
                 clearTimeout(fetchTimeoutRef.current);
             }
         };
-    }, [page, pageSize, search, productFilter, productsLoaded, fetchInventory]);
+    }, [page, pageSize, listQuery, stockFilter, productsLoaded, fetchInventory]);
 
     useEffect(() => {
         if (editingItem && !canManageStock(editingItem)) {
@@ -526,16 +483,15 @@ export default function StockManagement() {
         await reloadAll(true);
     };
 
-    const summary = useMemo(() => computeInventorySummary(summaryItems), [summaryItems]);
-    const filterCounts = useMemo(() => computeFilterCounts(items), [items]);
-    const filteredItems = useMemo(
-        () => filterInventoryItems(items, stockFilter),
-        [items, stockFilter]
+    const filterCounts = useMemo(
+        () => buildApiFilterCounts(apiFilters, catalogCount),
+        [apiFilters, catalogCount]
     );
 
     const applyStockFilter = (key) => {
         const mapped = KPI_FILTER_MAP[key] || key;
         setStockFilter(mapped);
+        setPage(1);
     };
 
     const showApprovalBlocked = useCallback((item) => {
@@ -692,8 +648,8 @@ export default function StockManagement() {
             }
         >
             <StockKpiSection
-                summary={summary}
-                listTotalCount={totalCount}
+                summary={apiSummary}
+                recordCount={catalogCount}
                 summaryLoading={summaryLoading}
                 hasActiveQuery={hasActiveQuery}
                 onFilterSelect={applyStockFilter}
@@ -735,63 +691,52 @@ export default function StockManagement() {
                         aria-selected={stockFilter === filter.key}
                         className={`stock-filter-tab ${stockFilter === filter.key ? "stock-filter-tab--active" : ""
                             }`}
-                        onClick={() => setStockFilter(filter.key)}
+                        onClick={() => applyStockFilter(filter.key)}
                     >
                         {filter.label}
                         <span className="stock-filter-count">{filterCounts[filter.key] ?? 0}</span>
                     </button>
                 ))}
-                <span className="stock-filter-hint">Filters apply to the current page</span>
             </div>
 
             {loading ? (
                 <TableSkeleton columns={COLUMNS.length} rows={Math.min(pageSize, 8)} />
             ) : error ? (
                 <PageError message={error} onRetry={reloadAll} />
-            ) : filteredItems.length === 0 ? (
+            ) : items.length === 0 ? (
                 <PageEmpty
                     icon={Package}
-                    title={items.length === 0 ? "No stock records found" : "No records match this filter"}
+                    title={
+                        search || productFilter || stockFilter !== "all"
+                            ? "No records match this filter"
+                            : "No stock records found"
+                    }
                     description={
-                        items.length === 0
-                            ? search || productFilter
-                                ? "Try adjusting your search or product filter."
-                                : "Inventory records are created when you add products with variants. Manage quantities here after catalog setup."
-                            : "Try a different stock health filter or clear your selection."
+                        search || productFilter || stockFilter !== "all"
+                            ? "Try a different filter, or clear search and status filters."
+                            : "Inventory records are created when you add products with variants. Manage quantities here after catalog setup."
                     }
                     action={
-                        items.length === 0 && !search && !productFilter ? (
+                        !search && !productFilter && stockFilter === "all" ? (
                             <Button onClick={() => navigate("/vendor/products")}>Go to Products</Button>
-                        ) : stockFilter !== "all" ? (
-                            <Button variant="secondary" onClick={() => setStockFilter("all")}>
-                                Show all on this page
-                            </Button>
-                        ) : hasActiveQuery ? (
+                        ) : (
                             <Button variant="secondary" onClick={clearFilters}>
                                 Clear filters
                             </Button>
-                        ) : null
+                        )
                     }
                 />
             ) : (
                 <TableCard>
                     <div className="px-4 pt-4 pb-2 text-sm text-gray-500">
-                        Showing <strong>{filteredItems.length}</strong> of{" "}
-                        <strong>{items.length}</strong> on this page ·{" "}
-                        <strong>{totalCount.toLocaleString()}</strong> total records
-                        {stockFilter !== "all" ? (
-                            <>
-                                {" "}
-                                · filter{" "}
-                                <strong>
-                                    {STOCK_FILTERS.find((f) => f.key === stockFilter)?.label}
-                                </strong>
-                            </>
-                        ) : null}
+                        <strong>{totalCount.toLocaleString()}</strong>{" "}
+                        {stockFilter === "all"
+                            ? "records"
+                            : STOCK_FILTERS.find((f) => f.key === stockFilter)?.label?.toLowerCase()}
                     </div>
 
                     <DataTable columns={COLUMNS} stickyActions>
-                        {filteredItems.map((item) => (
+                        {items.map((item) => (
                             <StockTableRow
                                 key={item.id}
                                 item={item}
