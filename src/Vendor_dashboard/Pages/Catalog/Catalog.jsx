@@ -345,7 +345,7 @@ export default function Catalog() {
 
             const [catRes, subRes, brandRes, productList] = await Promise.all([
                 vendorService.getFieldInfo("product-category"),
-                vendorService.getFieldInfo("product-subcategory"),
+                vendorService.getFieldInfo("product-subcategory", { is_product_sale: true }),
                 vendorService.getFieldInfo("brand-name"),
                 fetchAllVendorProducts(vendorService),
             ]);
