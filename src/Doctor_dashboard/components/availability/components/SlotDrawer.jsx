@@ -282,7 +282,7 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
                         slots: formattedNewSlots,
                     }]
                 });
-                toast.success(`${formattedNewSlots.length} new slot(s) added successfully`);
+                // toast.success(`${formattedNewSlots.length} new slot(s) added successfully`);
             }
 
             if (modifiedSlots.length > 0 && onUpdate) {
@@ -381,7 +381,7 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
                                 className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-600 hover:border-[#0D614E]/60 hover:text-[#0D614E] transition-all duration-200 flex items-center justify-center gap-2 mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <Plus className="w-4 h-4" />
-                                Add Another Slot
+                                Add New Slot
                             </button>
 
                             {!editingSlot && (
