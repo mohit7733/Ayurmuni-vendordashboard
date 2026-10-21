@@ -135,7 +135,7 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
         e?.preventDefault();
         const query = searchInput.trim();
         if (query === search) {
-            fetchPlans();        
+            fetchPlans();          
         } else {
             setSearch(query);      
         }
