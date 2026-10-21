@@ -116,6 +116,14 @@
     gap: 8px;
 }
 
+.catalog-toolbar-search select {
+    height: 2.25rem;
+    min-height: 2.25rem;
+    font-size: 0.8125rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
 .catalog-toolbar-search input[type="search"] {
     height: 2.25rem;
     font-size: 0.8125rem;
