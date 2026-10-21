@@ -1005,7 +1005,7 @@ const AppointmentDetail = ({ videodetails }) => {
         surgical_history: '',
         allergies: '',
         family_history: '',
-        gynaecological : '',
+        gynaecological: '',
         personal_history: '',
         clinical_notes: '',
         diagnosis: '',
@@ -1334,7 +1334,7 @@ const AppointmentDetail = ({ videodetails }) => {
         clinical_notes: "",
         diagnosis: "",
         prescriptions: [],
-        gynaecological : "",
+        gynaecological: "",
         personal_history: "",
         follow_up: {
             schedule: false,
@@ -1402,7 +1402,7 @@ const AppointmentDetail = ({ videodetails }) => {
                     date: followUpDate,
                     reason: followUp.reason || "",
                 },
-                gynaecological : record?.gynaecological  || "",
+                gynaecological: record?.gynaecological || "",
                 personal_history: record?.personal_history || "",
                 dos: convertArrayToBulletText(record?.dos),
                 donts: convertArrayToBulletText(record?.donts),
@@ -1556,7 +1556,7 @@ const AppointmentDetail = ({ videodetails }) => {
                 donts: convertBulletTextToArray(formData?.donts),
                 follow_up: formData.follow_up,
                 personal_history: formData.personal_history,
-                gynaecological : formData.gynaecological ,
+                gynaecological: formData.gynaecological,
                 status: editingPrescriptionStatus || "sent",
                 prescription_items: prescriptionItems,
             }
@@ -1570,7 +1570,7 @@ const AppointmentDetail = ({ videodetails }) => {
                 history_of_past_illness: formData.history_of_past_illness,
                 clinical_notes: formData.clinical_notes,
                 personal_history: formData.personal_history,
-                gynaecological : formData.gynaecological ,
+                gynaecological: formData.gynaecological,
                 diagnosis_advice: formData.diagnosis,
                 prescription_items: prescriptionItems,
                 follow_up: formData.follow_up,
@@ -1875,6 +1875,15 @@ const AppointmentDetail = ({ videodetails }) => {
         // { id: 'billing', label: 'Billing', icon: IndianRupee },
     ];
 
+    const now = new Date();
+
+    const startTime = new Date(appointment?.start_time);
+    const endTime = new Date(appointment?.end_time);
+
+    const isCallTime =
+        now >= new Date(startTime.getTime() - 5 * 60 * 1000) &&
+        now <= endTime;
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100/50">
             <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -1953,15 +1962,25 @@ const AppointmentDetail = ({ videodetails }) => {
                                     <Link to={`/doctor/messenger/${patient?.id}`} className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 bg-emerald-50 text-[#0D614E]">
                                         <MessageCircle className="w-3.5 h-3.5" /> Message
                                     </Link>
-                                    {
-                                        appointment?.status == "confirmed" &&
-                                        <button onClick={e => {
-                                            // setshowCall(!showCall)
-                                            videodetails({ ...videodetails, showCall: !videodetails.showCall, patient: patient, appointment: appointment })
-                                        }} className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 bg-emerald-50 text-[#0D614E]">
-                                            <Video className="w-3.5 h-3.5" />Join Call
+
+                                    {/* {console.log(appointment?.start_time, appointment?.end_time)} */}
+
+                                    {appointment?.status === "confirmed" && isCallTime && (
+                                        <button
+                                            onClick={() => {
+                                                videodetails({
+                                                    ...videodetails,
+                                                    showCall: !videodetails.showCall,
+                                                    patient,
+                                                    appointment,
+                                                });
+                                            }}
+                                            className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all hover:opacity-80 bg-emerald-50 text-[#0D614E]"
+                                        >
+                                            <Video className="w-3.5 h-3.5" />
+                                            Start Call
                                         </button>
-                                    }
+                                    )}
 
                                 </div>
                             </div>
@@ -2133,7 +2152,7 @@ const AppointmentDetail = ({ videodetails }) => {
                                             <div className="space-y-2">
                                                 <label className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                                                     <NotebookPen className="w-3.5 h-3.5 text-emerald-600" />
-                                                    Personal History 
+                                                    Personal History
                                                 </label>
                                                 <textarea
                                                     rows={4}
@@ -2147,11 +2166,11 @@ const AppointmentDetail = ({ videodetails }) => {
                                             <div className="space-y-2">
                                                 <label className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">
                                                     <NotebookPen className="w-3.5 h-3.5 text-emerald-600" />
-                                                    Gynaecological  History 
+                                                    Gynaecological  History
                                                 </label>
                                                 <textarea
                                                     rows={4}
-                                                    value={formData.gynaecological }
+                                                    value={formData.gynaecological}
                                                     onChange={e => handleInputChange('gynaecological', e.target.value)}
                                                     placeholder="Gynaecological history..."
                                                     className="w-full px-4 py-3 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none transition-all"

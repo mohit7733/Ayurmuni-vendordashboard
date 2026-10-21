@@ -144,7 +144,7 @@ export default function AddProduct() {
     try {
       const [brand, productcat, diseasescat] = await Promise.all([
         vendorService.getbrandandcategory("brand-name"),
-        vendorService.getbrandandcategory("product-subcategory"),
+        vendorService.getbrandandcategory("product-subcategory", { is_product_sale: true }),
         // vendorService.getbrandandcategory("category"),
         vendorService.getbrandandcategory("health-diseases"),
       ]);
@@ -900,7 +900,7 @@ export default function AddProduct() {
           Back
         </Button>
       }
-      contentClassName="p-4 sm:p-6 lg:p-8 max-w-8xl"
+      contentClassName="p-4 sm:p-6 lg:p-8 max-w-8xl min-h-[calc(100vh-60px)] overflow-y-auto"
     >
       <UnicommerceNotice>
         {UNICOMMERCE_NOTICES.pendingVariant} {UNICOMMERCE_NOTICES.systemSku}
