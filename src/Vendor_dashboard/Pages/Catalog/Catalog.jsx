@@ -830,7 +830,7 @@ export default function Catalog() {
                             aria-label="Filter by subcategory"
                             className="w-full sm:w-44"
                         />
-                        <SelectFilter
+                        {/* <SelectFilter
                             value={approvalFilter}
                             onChange={(e) => setApprovalFilter(e.target.value)}
                             options={APPROVAL_FILTERS}
@@ -845,7 +845,7 @@ export default function Catalog() {
                             placeholder="All statuses"
                             aria-label="Filter by active status"
                             className="w-full sm:w-32"
-                        />
+                        /> */}
                     </SearchToolbar>
 
                     {hasActiveFilters && !loading && !error && (

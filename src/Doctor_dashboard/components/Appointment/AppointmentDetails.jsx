@@ -1963,9 +1963,9 @@ const AppointmentDetail = ({ videodetails }) => {
                                         <MessageCircle className="w-3.5 h-3.5" /> Message
                                     </Link>
 
-                                    {/* {console.log(appointment?.start_time, appointment?.end_time)} */}
+                                    {/* {console.log(isCallTime)} */}
 
-                                    {appointment?.status === "confirmed" && isCallTime && (
+                                    {appointment?.status === "confirmed" &&  (
                                         <button
                                             onClick={() => {
                                                 videodetails({
