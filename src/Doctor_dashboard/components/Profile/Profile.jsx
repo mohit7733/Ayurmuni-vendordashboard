@@ -2218,7 +2218,7 @@ const DoctorProfile = () => {
                                             );
                                         })}
                                     </div>
-                                    <div className="mt-6 p-4 bg-amber-50/50 rounded-xl border border-amber-100">
+                                    {/* <div className="mt-6 p-4 bg-amber-50/50 rounded-xl border border-amber-100">
                                         <div className="flex items-start gap-3">
                                             <AlertCircle size={18} className="text-amber-600 mt-0.5" />
                                             <div>
@@ -2226,7 +2226,7 @@ const DoctorProfile = () => {
                                                 <p className="text-xs text-amber-700">Documents are typically verified within 24-48 hours. Please ensure all uploaded documents are clear and legible.</p>
                                             </div>
                                         </div>
-                                    </div>
+                                    </div> */}
                                 </div>
                             )}
 

@@ -11,14 +11,18 @@ import {
     Tag,
 } from "lucide-react";
 import { vendorService } from "../../../services/vendorService";
-import { fetchAllVendorProducts } from "../Stock/stockHelpers";
+import {
+    fetchAllVendorProducts,
+    normalizeBrand,
+    productMatchesBrand,
+} from "../Stock/stockHelpers";
 import { getVariantCoverImageUrl, mapVariantFromApi } from "../../../utils/unicommerceHelpers";
 import Ayurvedaimage from "../../../Assests/Ayurvedaimage.png";
 import DashboardPageShell from "../../components/shared/DashboardPageShell";
 import { PageEmpty, PageError } from "../../components/shared/PageState";
 import { MetricSkeleton } from "../../components/shared/Skeleton";
 import StatusBadge from "../../components/shared/StatusBadge";
-import SearchToolbar from "../../components/shared/SearchToolbar";
+import SearchToolbar, { SelectFilter } from "../../components/shared/SearchToolbar";
 import Button from "../../components/shared/Button";
 import PremiumKPICard from "../Dashboard/components/PremiumKPICard";
 import "../../components/shared/vendor-shared.css";
@@ -29,6 +33,17 @@ const CATALOG_VIEWS = [
     { id: "brands", label: "Brands", icon: Tag },
 ];
 
+const APPROVAL_FILTERS = [
+    { value: "approved", label: "Approved" },
+    { value: "pending", label: "Pending" },
+    { value: "rejected", label: "Rejected" },
+];
+
+const ACTIVE_FILTERS = [
+    { value: "active", label: "Active" },
+    { value: "inactive", label: "Inactive" },
+];
+
 function getCategoryIdForSubcategory(sub) {
     return sub.product_category_id ?? sub.category_id ?? sub.product_category ?? null;
 }
@@ -37,10 +52,48 @@ function getSubcategoryIdForProduct(product) {
     return product.product_subcategory_id ?? product.subcategory_id ?? null;
 }
 
+function getProductCategoryId(product) {
+    return product.product_category_id ?? product.category_id ?? null;
+}
+
 function getProductCoverUrl(product) {
     const variant =
         (product.variants || []).find((v) => getVariantCoverImageUrl(v)) || product.variants?.[0];
     return getVariantCoverImageUrl(variant);
+}
+
+function getProductApprovalStatus(product) {
+    const direct = (product.approval_status || "").toLowerCase();
+    if (direct) return direct;
+    const fromVariant = (product.variants || []).find((v) => v.approval_status)?.approval_status;
+    return (fromVariant || "pending").toLowerCase();
+}
+
+function matchesActiveStatus(item, activeFilter) {
+    if (!activeFilter) return true;
+    const isActive = item.is_active !== false;
+    return activeFilter === "active" ? isActive : !isActive;
+}
+
+function productMatchesApproval(product, approvalFilter) {
+    if (!approvalFilter) return true;
+    return getProductApprovalStatus(product) === approvalFilter;
+}
+
+function productMatchesCategory(product, categoryId, subcategoryLookup) {
+    if (!categoryId) return true;
+    const direct = getProductCategoryId(product);
+    if (direct != null && String(direct) === String(categoryId)) return true;
+    const subId = getSubcategoryIdForProduct(product);
+    if (subId == null) return false;
+    const sub = subcategoryLookup.get(String(subId));
+    if (!sub) return false;
+    return String(getCategoryIdForSubcategory(sub)) === String(categoryId);
+}
+
+function productMatchesSubcategory(product, subcategoryId) {
+    if (!subcategoryId) return true;
+    return String(getSubcategoryIdForProduct(product) ?? "") === String(subcategoryId);
 }
 
 function matchesSearch(item, search, type = "default") {
@@ -63,10 +116,7 @@ function matchesSearch(item, search, type = "default") {
 function ProductCatalogCard({ product }) {
     const coverUrl = getProductCoverUrl(product) || Ayurvedaimage;
     const variantCount = product.variants?.length || 0;
-    const approval =
-        product.approval_status ||
-        (product.variants || []).find((v) => v.approval_status)?.approval_status ||
-        "pending";
+    const approval = getProductApprovalStatus(product);
 
     return (
         <Link to={`/vendor/products/${product.id}`} className="catalog-product-card">
@@ -103,6 +153,7 @@ function SubcategoryAccordionItem({
     expanded,
     onToggle,
     search,
+    hasProductFilters,
 }) {
     const visibleProducts = useMemo(() => {
         if (!search) return products;
@@ -111,6 +162,7 @@ function SubcategoryAccordionItem({
 
     const productCount = products.length;
     const matchCount = search ? visibleProducts.length : productCount;
+    const showMatchLabel = (search || hasProductFilters) && matchCount !== productCount;
 
     return (
         <li className={`catalog-subcategory ${expanded ? "catalog-subcategory--open" : ""}`}>
@@ -139,7 +191,7 @@ function SubcategoryAccordionItem({
                             </span>
                         )}
                         <span className="catalog-subcategory-item__products">
-                            {search && matchCount !== productCount
+                            {showMatchLabel
                                 ? `${matchCount} of ${productCount} products`
                                 : `${productCount} product${productCount === 1 ? "" : "s"}`}
                         </span>
@@ -156,7 +208,7 @@ function SubcategoryAccordionItem({
                 <div className="catalog-subcategory__panel-inner">
                     {visibleProducts.length === 0 ? (
                         <p className="catalog-subcategory__empty">
-                            {search
+                            {search || hasProductFilters
                                 ? "No matching products"
                                 : "No products in this subcategory yet"}
                         </p>
@@ -182,15 +234,17 @@ function CategoryAccordionItem({
     expandedSubIds,
     onToggleSub,
     search,
+    hasProductFilters,
 }) {
     const visibleSubs = useMemo(() => {
-        if (!search) return subcategories;
+        if (!search && !hasProductFilters) return subcategories;
         return subcategories.filter((sub) => {
-            if (matchesSearch(sub, search)) return true;
+            if (search && matchesSearch(sub, search)) return true;
             const prods = productsBySubcategory.get(String(sub.id)) || [];
+            if (hasProductFilters && prods.length > 0) return true;
             return prods.some((p) => matchesSearch(p, search, "product"));
         });
-    }, [subcategories, productsBySubcategory, search]);
+    }, [subcategories, productsBySubcategory, search, hasProductFilters]);
 
     const subCount = subcategories.length;
     const productCount = subcategories.reduce(
@@ -232,7 +286,7 @@ function CategoryAccordionItem({
                 <div className="catalog-category__panel-inner">
                     {visibleSubs.length === 0 ? (
                         <p className="catalog-category__empty">
-                            {search
+                            {search || hasProductFilters
                                 ? "No matching subcategories"
                                 : "No subcategories under this category"}
                         </p>
@@ -246,6 +300,7 @@ function CategoryAccordionItem({
                                     expanded={expandedSubIds.has(String(sub.id))}
                                     onToggle={() => onToggleSub(sub.id)}
                                     search={search}
+                                    hasProductFilters={hasProductFilters}
                                 />
                             ))}
                         </ul>
@@ -256,16 +311,28 @@ function CategoryAccordionItem({
     );
 }
 
-function BrandCard({ brand }) {
+function BrandCard({ brand, productCount, onClick }) {
     const initial = (brand.name || "?").charAt(0).toUpperCase();
 
     return (
-        <article className="catalog-brand-card">
+        <article
+            className="catalog-brand-card"
+            onClick={onClick}
+            onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onClick?.();
+                }
+            }}
+            role={onClick ? "button" : undefined}
+            tabIndex={onClick ? 0 : undefined}
+        >
             <div className="catalog-brand-card__avatar" aria-hidden>
                 {initial}
             </div>
             <div className="catalog-brand-card__body min-w-0">
                 <p className="catalog-brand-card__name">{brand.name}</p>
+                <p className="catalog-brand-card__code">{productCount} products</p>
                 {brand.code ? (
                     <code className="catalog-brand-card__code">{brand.code}</code>
                 ) : (
@@ -333,6 +400,11 @@ export default function Catalog() {
     const [error, setError] = useState("");
     const [search, setSearch] = useState("");
     const [searchInput, setSearchInput] = useState("");
+    const [brandId, setBrandId] = useState("");
+    const [categoryId, setCategoryId] = useState("");
+    const [subcategoryId, setSubcategoryId] = useState("");
+    const [approvalFilter, setApprovalFilter] = useState("");
+    const [activeFilter, setActiveFilter] = useState("");
     const [activeView, setActiveView] = useState("tree");
     const [expandedCategoryIds, setExpandedCategoryIds] = useState(() => new Set());
     const [expandedSubIds, setExpandedSubIds] = useState(() => new Set());
@@ -345,9 +417,9 @@ export default function Catalog() {
 
             const [catRes, subRes, brandRes, productList] = await Promise.all([
                 vendorService.getFieldInfo("product-category"),
-                vendorService.getFieldInfo("product-subcategory"),
+                vendorService.getFieldInfo("product-subcategory", { is_product_sale: true }),
                 vendorService.getFieldInfo("brand-name"),
-                fetchAllVendorProducts(vendorService),
+                fetchAllVendorProducts(vendorService, 100000, brandId || null),
             ]);
 
             setCategories(catRes.data?.data || []);
@@ -365,7 +437,7 @@ export default function Catalog() {
             setLoading(false);
             setRefreshing(false);
         }
-    }, []);
+    }, [brandId]);
 
     useEffect(() => {
         fetchAll();
@@ -375,14 +447,78 @@ export default function Catalog() {
         setSearch(searchInput.trim());
     }, [searchInput]);
 
-    const clearSearch = useCallback(() => {
+    const clearFilters = useCallback(() => {
         setSearch("");
         setSearchInput("");
+        setBrandId("");
+        setCategoryId("");
+        setSubcategoryId("");
+        setApprovalFilter("");
+        setActiveFilter("");
     }, []);
+
+    const subcategoryById = useMemo(() => {
+        const map = new Map();
+        subcategories.forEach((sub) => map.set(String(sub.id), sub));
+        return map;
+    }, [subcategories]);
+
+    const hasProductFilters = Boolean(brandId || categoryId || subcategoryId || approvalFilter);
+    const hasActiveFilters = Boolean(
+        search || brandId || categoryId || subcategoryId || approvalFilter || activeFilter
+    );
+
+    const filteredProducts = useMemo(
+        () =>
+            products.filter(
+                (product) =>
+                    productMatchesBrand(product, brandId) &&
+                    productMatchesCategory(product, categoryId, subcategoryById) &&
+                    productMatchesSubcategory(product, subcategoryId) &&
+                    productMatchesApproval(product, approvalFilter)
+            ),
+        [products, brandId, categoryId, subcategoryId, approvalFilter, subcategoryById]
+    );
+
+    const brandOptions = useMemo(
+        () =>
+            brands
+                .map(normalizeBrand)
+                .filter(Boolean)
+                .map((brand) => ({ value: brand.id, label: brand.name })),
+        [brands]
+    );
+
+    const categoryOptions = useMemo(
+        () =>
+            categories
+                .filter((cat) => matchesActiveStatus(cat, activeFilter))
+                .map((cat) => ({ value: String(cat.id), label: cat.name || "Untitled" })),
+        [categories, activeFilter]
+    );
+
+    const subcategoryOptions = useMemo(() => {
+        const list = categoryId
+            ? subcategories.filter(
+                  (sub) => String(getCategoryIdForSubcategory(sub)) === String(categoryId)
+              )
+            : subcategories;
+        return list
+            .filter((sub) => matchesActiveStatus(sub, activeFilter))
+            .map((sub) => ({ value: String(sub.id), label: sub.name || "Untitled" }));
+    }, [subcategories, categoryId, activeFilter]);
+
+    useEffect(() => {
+        if (!subcategoryId) return;
+        const stillValid = subcategoryOptions.some((opt) => opt.value === String(subcategoryId));
+        if (!stillValid) setSubcategoryId("");
+    }, [subcategoryId, subcategoryOptions]);
 
     const subcategoriesByCategory = useMemo(() => {
         const map = new Map();
         subcategories.forEach((sub) => {
+            if (!matchesActiveStatus(sub, activeFilter)) return;
+            if (subcategoryId && String(sub.id) !== String(subcategoryId)) return;
             const catId = getCategoryIdForSubcategory(sub);
             if (catId == null) return;
             const key = String(catId);
@@ -390,11 +526,11 @@ export default function Catalog() {
             map.get(key).push(sub);
         });
         return map;
-    }, [subcategories]);
+    }, [subcategories, activeFilter, subcategoryId]);
 
     const productsBySubcategory = useMemo(() => {
         const map = new Map();
-        products.forEach((product) => {
+        filteredProducts.forEach((product) => {
             const subId = getSubcategoryIdForProduct(product);
             if (subId == null) return;
             const key = String(subId);
@@ -402,30 +538,64 @@ export default function Catalog() {
             map.get(key).push(product);
         });
         return map;
-    }, [products]);
+    }, [filteredProducts]);
 
     const unassignedProducts = useMemo(
-        () => products.filter((p) => getSubcategoryIdForProduct(p) == null),
-        [products]
+        () => filteredProducts.filter((p) => getSubcategoryIdForProduct(p) == null),
+        [filteredProducts]
     );
 
     const visibleCategories = useMemo(() => {
-        if (!search) return categories;
         return categories.filter((cat) => {
-            if (matchesSearch(cat, search)) return true;
+            if (categoryId && String(cat.id) !== String(categoryId)) return false;
+            if (!matchesActiveStatus(cat, activeFilter)) return false;
+
             const subs = subcategoriesByCategory.get(String(cat.id)) || [];
-            return subs.some((sub) => {
-                if (matchesSearch(sub, search)) return true;
-                const prods = productsBySubcategory.get(String(sub.id)) || [];
-                return prods.some((p) => matchesSearch(p, search, "product"));
-            });
+            const hasMatchingProducts = subs.some(
+                (sub) => (productsBySubcategory.get(String(sub.id)) || []).length > 0
+            );
+            const unassignedInCategory =
+                !subcategoryId &&
+                unassignedProducts.some((p) => productMatchesCategory(p, cat.id, subcategoryById));
+
+            if (!search && !hasProductFilters) return true;
+            if (search && matchesSearch(cat, search)) return true;
+            if (
+                subs.some((sub) => {
+                    if (search && matchesSearch(sub, search)) return true;
+                    const prods = productsBySubcategory.get(String(sub.id)) || [];
+                    if (hasProductFilters && prods.length > 0) return true;
+                    return prods.some((p) => matchesSearch(p, search, "product"));
+                })
+            ) {
+                return true;
+            }
+            if (hasProductFilters && (hasMatchingProducts || unassignedInCategory)) return true;
+            return false;
         });
-    }, [categories, subcategoriesByCategory, productsBySubcategory, search]);
+    }, [
+        categories,
+        categoryId,
+        activeFilter,
+        search,
+        hasProductFilters,
+        subcategoriesByCategory,
+        productsBySubcategory,
+        unassignedProducts,
+        subcategoryId,
+        subcategoryById,
+    ]);
 
     const filteredBrands = useMemo(() => {
-        if (!search) return brands;
-        return brands.filter((brand) => matchesSearch(brand, search));
-    }, [brands, search]);
+        return brands.filter((brand) => {
+            if (!matchesActiveStatus(brand, activeFilter)) return false;
+            if (brandId && String(brand.id ?? brand.brand_id ?? brand.brand_name_id) !== String(brandId)) {
+                return false;
+            }
+            if (search && !matchesSearch(brand, search)) return false;
+            return true;
+        });
+    }, [brands, activeFilter, brandId, search]);
 
     const filteredUnassigned = useMemo(() => {
         if (!search) return unassignedProducts;
@@ -433,22 +603,37 @@ export default function Catalog() {
     }, [unassignedProducts, search]);
 
     const matchedProductCount = useMemo(() => {
-        if (!search) return products.length;
-        return products.filter((p) => matchesSearch(p, search, "product")).length;
-    }, [products, search]);
+        if (!search) return filteredProducts.length;
+        return filteredProducts.filter((p) => matchesSearch(p, search, "product")).length;
+    }, [filteredProducts, search]);
+
+    const productCountByBrand = useMemo(() => {
+        const map = new Map();
+        products.forEach((product) => {
+            const id = String(product.brand_name_id ?? product.brand_id ?? "");
+            if (!id) return;
+            map.set(id, (map.get(id) || 0) + 1);
+        });
+        return map;
+    }, [products]);
 
     useEffect(() => {
-        if (!search) return;
+        if (!hasActiveFilters) return;
         setExpandedCategoryIds((prev) => {
             const next = new Set(prev);
             visibleCategories.forEach((cat) => {
                 const subs = subcategoriesByCategory.get(String(cat.id)) || [];
                 const catMatch =
-                    matchesSearch(cat, search) ||
+                    (search && matchesSearch(cat, search)) ||
+                    hasProductFilters ||
+                    categoryId ||
                     subs.some((sub) => {
-                        if (matchesSearch(sub, search)) return true;
+                        if (search && matchesSearch(sub, search)) return true;
                         const prods = productsBySubcategory.get(String(sub.id)) || [];
-                        return prods.some((p) => matchesSearch(p, search, "product"));
+                        return (
+                            (hasProductFilters && prods.length > 0) ||
+                            prods.some((p) => matchesSearch(p, search, "product"))
+                        );
                     });
                 if (catMatch) next.add(String(cat.id));
             });
@@ -457,21 +642,35 @@ export default function Catalog() {
         setExpandedSubIds((prev) => {
             const next = new Set(prev);
             subcategories.forEach((sub) => {
-                if (matchesSearch(sub, search)) {
+                if (subcategoryId && String(sub.id) !== String(subcategoryId)) return;
+                if (search && matchesSearch(sub, search)) {
                     next.add(String(sub.id));
                     return;
                 }
                 const prods = productsBySubcategory.get(String(sub.id)) || [];
-                if (prods.some((p) => matchesSearch(p, search, "product"))) {
+                if (
+                    (hasProductFilters && prods.length > 0) ||
+                    prods.some((p) => matchesSearch(p, search, "product"))
+                ) {
                     next.add(String(sub.id));
                 }
             });
             return next;
         });
-    }, [search, visibleCategories, subcategoriesByCategory, productsBySubcategory, subcategories]);
+    }, [
+        hasActiveFilters,
+        search,
+        hasProductFilters,
+        categoryId,
+        subcategoryId,
+        visibleCategories,
+        subcategoriesByCategory,
+        productsBySubcategory,
+        subcategories,
+    ]);
 
-    const toggleCategory = (categoryId) => {
-        const key = String(categoryId);
+    const toggleCategory = (id) => {
+        const key = String(id);
         setExpandedCategoryIds((prev) => {
             const next = new Set(prev);
             if (next.has(key)) next.delete(key);
@@ -480,8 +679,8 @@ export default function Catalog() {
         });
     };
 
-    const toggleSubcategory = (subId) => {
-        const key = String(subId);
+    const toggleSubcategory = (id) => {
+        const key = String(id);
         setExpandedSubIds((prev) => {
             const next = new Set(prev);
             if (next.has(key)) next.delete(key);
@@ -496,16 +695,19 @@ export default function Catalog() {
         visibleCategories.forEach((cat) => {
             const subs = subcategoriesByCategory.get(String(cat.id)) || [];
             subs.forEach((sub) => {
-                if (!search) {
+                if (!search && !hasProductFilters) {
                     subIds.add(String(sub.id));
                     return;
                 }
-                if (matchesSearch(sub, search)) {
+                if (search && matchesSearch(sub, search)) {
                     subIds.add(String(sub.id));
                     return;
                 }
                 const prods = productsBySubcategory.get(String(sub.id)) || [];
-                if (prods.some((p) => matchesSearch(p, search, "product"))) {
+                if (
+                    (hasProductFilters && prods.length > 0) ||
+                    prods.some((p) => matchesSearch(p, search, "product"))
+                ) {
                     subIds.add(String(sub.id));
                 }
             });
@@ -518,15 +720,22 @@ export default function Catalog() {
         setExpandedSubIds(new Set());
     };
 
+    const selectBrandFromCard = (brand) => {
+        const id = String(brand.id ?? brand.brand_id ?? brand.brand_name_id ?? "");
+        if (!id) return;
+        setBrandId(id);
+        setActiveView("tree");
+    };
+
     const summary = useMemo(
         () => ({
             categories: categories.length,
             subcategories: subcategories.length,
             products: products.length,
             brands: brands.length,
-            unassigned: unassignedProducts.length,
+            unassigned: products.filter((p) => getSubcategoryIdForProduct(p) == null).length,
         }),
-        [categories.length, subcategories.length, products.length, brands.length, unassignedProducts.length]
+        [categories.length, subcategories.length, products.length, brands.length, products]
     );
 
     const hasExpanded = expandedCategoryIds.size > 0 || expandedSubIds.size > 0;
@@ -590,16 +799,66 @@ export default function Catalog() {
                         value={searchInput}
                         onChange={(e) => setSearchInput(e.target.value)}
                         onSubmit={applySearch}
-                        onClear={searchInput || search ? clearSearch : undefined}
+                        onClear={hasActiveFilters ? clearFilters : undefined}
                         live
                         placeholder="Search categories, subcategories, products, or brands…"
-                    />
+                    >
+                        <SelectFilter
+                            value={brandId}
+                            onChange={(e) => setBrandId(e.target.value)}
+                            options={brandOptions}
+                            placeholder="All brands"
+                            aria-label="Filter by brand"
+                            className="w-full sm:w-40"
+                        />
+                        <SelectFilter
+                            value={categoryId}
+                            onChange={(e) => {
+                                setCategoryId(e.target.value);
+                                setSubcategoryId("");
+                            }}
+                            options={categoryOptions}
+                            placeholder="All categories"
+                            aria-label="Filter by category"
+                            className="w-full sm:w-44"
+                        />
+                        <SelectFilter
+                            value={subcategoryId}
+                            onChange={(e) => setSubcategoryId(e.target.value)}
+                            options={subcategoryOptions}
+                            placeholder="All subcategories"
+                            aria-label="Filter by subcategory"
+                            className="w-full sm:w-44"
+                        />
+                        {/* <SelectFilter
+                            value={approvalFilter}
+                            onChange={(e) => setApprovalFilter(e.target.value)}
+                            options={APPROVAL_FILTERS}
+                            placeholder="All approvals"
+                            aria-label="Filter by approval status"
+                            className="w-full sm:w-36"
+                        />
+                        <SelectFilter
+                            value={activeFilter}
+                            onChange={(e) => setActiveFilter(e.target.value)}
+                            options={ACTIVE_FILTERS}
+                            placeholder="All statuses"
+                            aria-label="Filter by active status"
+                            className="w-full sm:w-32"
+                        /> */}
+                    </SearchToolbar>
 
-                    {search && !loading && !error && (
+                    {hasActiveFilters && !loading && !error && (
                         <div className="catalog-search-meta" role="status">
                             <span>
-                                Showing matches for <strong>“{search}”</strong>
-                                {" · "}
+                                {search ? (
+                                    <>
+                                        Showing matches for <strong>“{search}”</strong>
+                                        {" · "}
+                                    </>
+                                ) : (
+                                    <>Filtered catalog · </>
+                                )}
                                 {visibleCategories.length} categor
                                 {visibleCategories.length === 1 ? "y" : "ies"}
                                 {" · "}
@@ -609,8 +868,12 @@ export default function Catalog() {
                                 {filteredBrands.length} brand
                                 {filteredBrands.length === 1 ? "" : "s"}
                             </span>
-                            <button type="button" className="catalog-search-meta__clear" onClick={clearSearch}>
-                                Clear search
+                            <button
+                                type="button"
+                                className="catalog-search-meta__clear"
+                                onClick={clearFilters}
+                            >
+                                Clear filters
                             </button>
                         </div>
                     )}
@@ -618,12 +881,18 @@ export default function Catalog() {
                     <div className="catalog-layout">
                         <section
                             className={`catalog-panel catalog-panel--tree ${
-                                activeView === "tree" ? "catalog-panel--active" : "catalog-panel--hidden-mobile"
+                                activeView === "tree"
+                                    ? "catalog-panel--active"
+                                    : "catalog-panel--hidden-mobile"
                             }`}
                         >
                             <header className="catalog-panel__header">
                                 <div className="catalog-panel__heading">
-                                    <Layers size={18} className="catalog-panel__heading-icon" aria-hidden />
+                                    <Layers
+                                        size={18}
+                                        className="catalog-panel__heading-icon"
+                                        aria-hidden
+                                    />
                                     <div>
                                         <h2 className="catalog-panel__title">Catalog tree</h2>
                                         <p className="catalog-panel__subtitle">
@@ -651,7 +920,8 @@ export default function Catalog() {
                                             Collapse
                                         </button>
                                         <span className="catalog-panel__badge">
-                                            {visibleCategories.length} cat · {summary.products} products
+                                            {visibleCategories.length} cat · {matchedProductCount}{" "}
+                                            products
                                         </span>
                                     </div>
                                 )}
@@ -661,20 +931,27 @@ export default function Catalog() {
                                 {loading ? (
                                     <div className="catalog-skeleton-list">
                                         {Array.from({ length: 5 }).map((_, i) => (
-                                            <div key={i} className="catalog-skeleton-row ds-skeleton" />
+                                            <div
+                                                key={i}
+                                                className="catalog-skeleton-row ds-skeleton"
+                                            />
                                         ))}
                                     </div>
                                 ) : error ? (
                                     <PageError message={error} onRetry={() => fetchAll()} />
                                 ) : treeEmpty ? (
                                     <PageEmpty
-                                        title={search ? "No catalog matches" : "No catalog items yet"}
+                                        title={
+                                            hasActiveFilters
+                                                ? "No catalog matches"
+                                                : "No catalog items yet"
+                                        }
                                         description={
-                                            search
-                                                ? "Try a different search term, or clear the filter."
+                                            hasActiveFilters
+                                                ? "Try different filters, or clear them."
                                                 : "Categories and products will appear here once available."
                                         }
-                                        icon={search ? SearchX : Package}
+                                        icon={hasActiveFilters ? SearchX : Package}
                                     />
                                 ) : (
                                     <>
@@ -684,19 +961,24 @@ export default function Catalog() {
                                                     key={category.id}
                                                     category={category}
                                                     subcategories={
-                                                        subcategoriesByCategory.get(String(category.id)) || []
+                                                        subcategoriesByCategory.get(
+                                                            String(category.id)
+                                                        ) || []
                                                     }
                                                     productsBySubcategory={productsBySubcategory}
-                                                    expanded={expandedCategoryIds.has(String(category.id))}
+                                                    expanded={expandedCategoryIds.has(
+                                                        String(category.id)
+                                                    )}
                                                     onToggle={() => toggleCategory(category.id)}
                                                     expandedSubIds={expandedSubIds}
                                                     onToggleSub={toggleSubcategory}
                                                     search={search}
+                                                    hasProductFilters={hasProductFilters}
                                                 />
                                             ))}
                                         </div>
 
-                                        {filteredUnassigned.length > 0 && (
+                                        {filteredUnassigned.length > 0 && !subcategoryId && (
                                             <div className="catalog-unassigned">
                                                 <header className="catalog-unassigned__header">
                                                     <Package size={16} aria-hidden />
@@ -732,7 +1014,11 @@ export default function Catalog() {
                         >
                             <header className="catalog-panel__header">
                                 <div className="catalog-panel__heading">
-                                    <Tag size={18} className="catalog-panel__heading-icon" aria-hidden />
+                                    <Tag
+                                        size={18}
+                                        className="catalog-panel__heading-icon"
+                                        aria-hidden
+                                    />
                                     <div>
                                         <h2 className="catalog-panel__title">Brands</h2>
                                         <p className="catalog-panel__subtitle">
@@ -759,19 +1045,35 @@ export default function Catalog() {
                                     </div>
                                 ) : error ? null : filteredBrands.length === 0 ? (
                                     <PageEmpty
-                                        title={search ? "No brands found" : "No brands yet"}
+                                        title={
+                                            hasActiveFilters ? "No brands found" : "No brands yet"
+                                        }
                                         description={
-                                            search
-                                                ? "Try a different search term."
+                                            hasActiveFilters
+                                                ? "Try different filters, or clear them."
                                                 : "Approved brands will show up here."
                                         }
                                         icon={Tag}
                                     />
                                 ) : (
                                     <div className="catalog-brand-grid">
-                                        {filteredBrands.map((brand) => (
-                                            <BrandCard key={brand.id} brand={brand} />
-                                        ))}
+                                        {filteredBrands.map((brand) => {
+                                            const id = String(
+                                                brand.id ?? brand.brand_id ?? brand.brand_name_id ?? ""
+                                            );
+                                            const count =
+                                                brand.product_count ??
+                                                productCountByBrand.get(id) ??
+                                                0;
+                                            return (
+                                                <BrandCard
+                                                    key={id || brand.name}
+                                                    brand={brand}
+                                                    productCount={count}
+                                                    onClick={() => selectBrandFromCard(brand)}
+                                                />
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </div>

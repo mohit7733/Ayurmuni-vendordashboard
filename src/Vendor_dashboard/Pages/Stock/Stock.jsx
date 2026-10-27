@@ -51,6 +51,10 @@ import {
     fetchAllVendorProducts,
     enrichInventoryWithApproval,
     fetchVariantApprovalStatus,
+    normalizeBrand,
+    uniqueServiceCategories,
+    productMatchesBrand,
+    productMatchesServiceCategory,
 } from "./stockHelpers";
 import "../../components/shared/vendor-shared.css";
 import "./Stock.css";
@@ -122,7 +126,7 @@ function StockKpiSection({ summary, recordCount, summaryLoading, hasActiveQuery,
                 icon={Warehouse}
                 label={hasActiveQuery ? "Matching records" : "Inventory records"}
                 value={recordCount}
-                subtitle={hasActiveQuery ? "Current search / product" : "Total in your catalog"}
+                subtitle={hasActiveQuery ? "Current search / filters" : "Total in your catalog"}
                 className="stock-kpi-clickable"
                 onAction={() => onFilterSelect("all")}
                 actionLabel="View all"
@@ -282,6 +286,10 @@ export default function StockManagement() {
     const [search, setSearch] = useState("");
     const [searchInput, setSearchInput] = useState("");
     const [productFilter, setProductFilter] = useState("");
+    const [brandId, setBrandId] = useState("");
+    const [serviceCategoryId, setServiceCategoryId] = useState("");
+    const [brands, setBrands] = useState([]);
+    const [serviceCategories, setServiceCategories] = useState([]);
     const [stockFilter, setStockFilter] = useState("all");
     const [page, setPage] = useState(1);
     const [totalCount, setTotalCount] = useState(0);
@@ -300,11 +308,45 @@ export default function StockManagement() {
     const inventoryRequestRef = useRef(0);
     const countsRequestRef = useRef(0);
 
-    const hasActiveQuery = Boolean(search || productFilter);
+    const hasActiveQuery = Boolean(search || productFilter || brandId || serviceCategoryId);
+    const hasActiveFilters = Boolean(
+        search || searchInput || productFilter || brandId || serviceCategoryId || stockFilter !== "all"
+    );
+
+    const brandOptions = useMemo(
+        () => brands.map((brand) => ({ value: brand.id, label: brand.name })),
+        [brands]
+    );
+
+    const serviceCategoryOptions = useMemo(
+        () =>
+            serviceCategories.map((category) => ({
+                value: category.id || category.name,
+                label: category.name,
+            })),
+        [serviceCategories]
+    );
+
+    // Local product list is matched by the selected category object
+    // (id and/or name); the API below receives only the id.
+    const selectedServiceCategory = useMemo(
+        () =>
+            serviceCategories.find(
+                (category) => (category.id || category.name) === serviceCategoryId
+            ) || serviceCategoryId,
+        [serviceCategories, serviceCategoryId]
+    );
 
     const productOptions = useMemo(
-        () => products.map((product) => ({ value: product.id, label: product.name })),
-        [products]
+        () =>
+            products
+                .filter(
+                    (product) =>
+                        productMatchesBrand(product, brandId) &&
+                        productMatchesServiceCategory(product, selectedServiceCategory)
+                )
+                .map((product) => ({ value: product.id, label: product.name })),
+        [products, brandId, selectedServiceCategory]
     );
 
     const fetchProducts = useCallback(async (forceRefresh = false) => {
@@ -342,8 +384,10 @@ export default function StockManagement() {
         () => ({
             search: search || undefined,
             product_id: productFilter || undefined,
+            brand_id: brandId || undefined,
+            service_category_id: serviceCategoryId || undefined,
         }),
-        [search, productFilter]
+        [search, productFilter, brandId, serviceCategoryId]
     );
 
     const fetchCounts = useCallback(async () => {
@@ -449,6 +493,43 @@ export default function StockManagement() {
     }, [fetchProducts]);
 
     useEffect(() => {
+        let cancelled = false;
+        Promise.all([
+            vendorService.getFieldInfo("brand-name"),
+            vendorService.getFieldInfo("product-subcategory", { is_product_sale: true }),
+        ])
+            .then(([brandResponse, categoryResponse]) => {
+                if (cancelled) return;
+                const brandList = Array.isArray(brandResponse.data?.data)
+                    ? brandResponse.data.data
+                    : [];
+                const categoryList = Array.isArray(categoryResponse.data?.data)
+                    ? categoryResponse.data.data
+                    : [];
+                setBrands(brandList.map(normalizeBrand).filter(Boolean));
+                setServiceCategories(uniqueServiceCategories(categoryList));
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setBrands([]);
+                    setServiceCategories([]);
+                }
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!productFilter) return;
+        const stillValid = productOptions.some((option) => String(option.value) === String(productFilter));
+        if (!stillValid) {
+            setProductFilter("");
+            setPage(1);
+        }
+    }, [productFilter, productOptions]);
+
+    useEffect(() => {
         if (!productsLoaded) return undefined;
         fetchCounts();
         return undefined;
@@ -525,6 +606,8 @@ export default function StockManagement() {
         setSearch("");
         setSearchInput("");
         setProductFilter("");
+        setBrandId("");
+        setServiceCategoryId("");
         setStockFilter("all");
         setPage(1);
     };
@@ -662,13 +745,31 @@ export default function StockManagement() {
                     setPage(1);
                     setSearch(searchInput.trim());
                 }}
-                onClear={
-                    search || searchInput || productFilter || stockFilter !== "all"
-                        ? clearFilters
-                        : undefined
-                }
+                onClear={hasActiveFilters ? clearFilters : undefined}
                 placeholder="Search system SKU, vendor SKU, variant, or product name…"
             >
+                <SelectFilter
+                    value={brandId}
+                    onChange={(e) => {
+                        setBrandId(e.target.value);
+                        setPage(1);
+                    }}
+                    options={brandOptions}
+                    placeholder="All brands"
+                    aria-label="Filter by brand"
+                    className="w-[11rem] min-w-[9rem] shrink-0"
+                />
+                <SelectFilter
+                    value={serviceCategoryId}
+                    onChange={(e) => {
+                        setServiceCategoryId(e.target.value);
+                        setPage(1);
+                    }}
+                    options={serviceCategoryOptions}
+                    placeholder="All service categories"
+                    aria-label="Filter by service category"
+                    className="w-[13rem] min-w-[10rem] shrink-0"
+                />
                 <SelectFilter
                     value={productFilter}
                     onChange={(e) => {
@@ -707,17 +808,17 @@ export default function StockManagement() {
                 <PageEmpty
                     icon={Package}
                     title={
-                        search || productFilter || stockFilter !== "all"
+                        hasActiveFilters
                             ? "No records match this filter"
                             : "No stock records found"
                     }
                     description={
-                        search || productFilter || stockFilter !== "all"
-                            ? "Try a different filter, or clear search and status filters."
+                        hasActiveFilters
+                            ? "Try a different brand, category, product, or stock filter."
                             : "Inventory records are created when you add products with variants. Manage quantities here after catalog setup."
                     }
                     action={
-                        !search && !productFilter && stockFilter === "all" ? (
+                        !hasActiveFilters ? (
                             <Button onClick={() => navigate("/vendor/products")}>Go to Products</Button>
                         ) : (
                             <Button variant="secondary" onClick={clearFilters}>

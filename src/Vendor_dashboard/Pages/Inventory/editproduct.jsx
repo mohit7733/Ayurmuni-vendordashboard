@@ -274,7 +274,7 @@ export default function EditProduct() {
         try {
             const [brand, productcat, diseasescat] = await Promise.all([
                 vendorService.getbrandandcategory("brand-name"),
-                vendorService.getbrandandcategory("product-subcategory"),
+                vendorService.getbrandandcategory("product-subcategory", { is_product_sale: true }),
                 vendorService.getbrandandcategory("health-diseases"),
             ]);
 
@@ -876,14 +876,15 @@ export default function EditProduct() {
             const value = current[key];
             const oldValue = original?.[key];
 
-            if (
-                value === "" ||
-                value === null ||
-                value === undefined ||
-                (Array.isArray(value) && value.length === 0)
-            ) {
-                return;
-            }
+            // if (
+            //     value == "" ||
+            //     value === null ||
+            //     value === undefined ||
+            //     (Array.isArray(value) && value.length === 0)
+            // ) {
+            //     // result[key] = value;
+            //     return;
+            // }
 
             if (
                 typeof value === "object" &&
@@ -996,7 +997,7 @@ export default function EditProduct() {
                     Back
                 </Button>
             }
-            contentClassName="p-4 sm:p-6 lg:p-8 max-w-8xl"
+            contentClassName="p-4 sm:p-6 lg:p-8 max-w-8xl  min-h-[calc(100vh-60px)] overflow-y-auto"
         >
 
             <UnicommerceNotice>
@@ -1204,6 +1205,18 @@ export default function EditProduct() {
                                             name="side_effects"
                                             placeholder="Possible side effects"
                                             value={formData.side_effects}
+                                            onChange={handleInputChange}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Dosage</label>
+                                        <input
+                                            type="text"
+                                            name="dosages"
+                                            placeholder=""
+                                            value={formData.dosages}
                                             onChange={handleInputChange}
                                         />
                                     </div>

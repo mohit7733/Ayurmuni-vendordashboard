@@ -34,7 +34,7 @@ const FILTER_LABELS = {
   low_stock: "Low stock",
   pending_approval: "Pending approval",
   pending: "Pending",
-  approved: "Approved",
+  approved: "Approved Variants",
   rejected: "Rejected",
   active: "Active",
   inactive: "Inactive",
@@ -130,6 +130,41 @@ function normalizeBrand(brand) {
     id: String(id),
     name: brand.name || brand.brand_name || "Untitled brand",
   };
+}
+
+function getServiceCategory(item) {
+  const category = item?.service_category;
+  const name = (
+    item?.service_category_name ||
+    (category && typeof category === "object" ? category.name : "") ||
+    ""
+  ).trim();
+  if (!name) return null;
+  const id =
+    item?.service_category_id ??
+    item?.service_categoryId ??
+    (category && typeof category === "object"
+      ? category.id ?? category.pk
+      : category) ??
+    item?.id;
+  return {
+    id: id == null || id === "" ? "" : String(id),
+    name,
+  };
+}
+
+function uniqueServiceCategories(items = []) {
+  return Array.from(
+    new Map(
+      items
+        .map(getServiceCategory)
+        .filter(Boolean)
+        .map((category) => [
+          category.id || category.name.toLowerCase(),
+          category,
+        ])
+    ).values()
+  ).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 const getVariantStatus = (stock) => {
@@ -232,6 +267,20 @@ function ProductBlock({ product, expanded, onToggle, onToggleStatus, onDelete })
             <span className="iv-meta-dot">•</span>
             <span className="iv-meta-label">Variants:</span>
             <span className="iv-meta-value">{product.variants?.length || 0}</span>
+            {product.service_category_name && (
+              <>
+                <span className="iv-meta-dot">•</span>
+                <span className="iv-meta-label">Service:</span>
+                <span className="iv-meta-value">{product.service_category_name}</span>
+              </>
+            )}
+            {product.product_subcategory && (
+              <>
+                <span className="iv-meta-dot">•</span>
+                <span className="iv-meta-label">Product Subcategory:</span>
+                <span className="iv-meta-value">{product.product_subcategory}</span>
+              </>
+            )}
             {product.product_subcategory_name && (
               <>
                 <span className="iv-meta-dot">•</span>
@@ -301,6 +350,7 @@ export default function InventoryVault() {
   const metaRequestRef = useRef(0);
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
+  const [serviceCategories, setServiceCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState("");
@@ -312,6 +362,7 @@ export default function InventoryVault() {
   const [searchInput, setSearchInput] = useState(location.state?.search || "");
   const [search, setSearch] = useState(location.state?.search || "");
   const [brandId, setBrandId] = useState("");
+  const [serviceCategoryId, setServiceCategoryId] = useState("");
   const [stockFilter, setStockFilter] = useState("all");
   const [pageSize, setPageSize] = usePersistedState("vendor:inventory:pageSize", 10);
   const safePageSize = clampPageSize(pageSize);
@@ -320,9 +371,10 @@ export default function InventoryVault() {
     () => ({
       search: search || undefined,
       brand_id: brandId || undefined,
+      service_category_id: serviceCategoryId || undefined,
       filter: stockFilter === "all" ? undefined : stockFilter,
     }),
-    [search, brandId, stockFilter]
+    [search, brandId, serviceCategoryId, stockFilter]
   );
 
   const fetchFilterMeta = useCallback(async () => {
@@ -333,6 +385,7 @@ export default function InventoryVault() {
         page_size: 1,
         search: search || undefined,
         brand_id: brandId || undefined,
+        service_category_id: serviceCategoryId || undefined,
       });
       if (requestId !== metaRequestRef.current) return;
       if (response.data?.success === false) return;
@@ -343,7 +396,7 @@ export default function InventoryVault() {
     } catch {
       if (requestId !== metaRequestRef.current) return;
     }
-  }, [search, brandId]);
+  }, [search, brandId, serviceCategoryId]);
 
   const fetchProducts = useCallback(async () => {
     const requestId = ++listRequestRef.current;
@@ -406,15 +459,24 @@ export default function InventoryVault() {
 
   useEffect(() => {
     let cancelled = false;
-    vendorService
-      .getFieldInfo("brand-name")
-      .then((response) => {
+    Promise.all([
+      vendorService.getFieldInfo("brand-name"),
+      vendorService.getFieldInfo("product-subcategory", { is_product_sale: true }),
+    ])
+      .then(([brandResponse, categoryResponse]) => {
         if (cancelled) return;
-        const list = Array.isArray(response.data?.data) ? response.data.data : [];
-        setBrands(list.map(normalizeBrand).filter(Boolean));
+        const brandList = Array.isArray(brandResponse.data?.data) ? brandResponse.data.data : [];
+        const categoryList = Array.isArray(categoryResponse.data?.data)
+          ? categoryResponse.data.data
+          : [];
+        setBrands(brandList.map(normalizeBrand).filter(Boolean));
+        setServiceCategories(uniqueServiceCategories(categoryList));
       })
       .catch(() => {
-        if (!cancelled) setBrands([]);
+        if (!cancelled) {
+          setBrands([]);
+          setServiceCategories([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -426,6 +488,15 @@ export default function InventoryVault() {
     [brands]
   );
 
+  const serviceCategoryOptions = useMemo(
+    () =>
+      serviceCategories.map((category) => ({
+        value: category.id || category.name,
+        label: category.name,
+      })),
+    [serviceCategories]
+  );
+
   const filterTabs = useMemo(() => buildFilterTabs(apiFilters), [apiFilters]);
   const summaryCards = useMemo(() => getSummaryCards(summary), [summary]);
 
@@ -434,7 +505,9 @@ export default function InventoryVault() {
     return [...PAGE_SIZE_OPTIONS, safePageSize].sort((a, b) => a - b);
   }, [safePageSize]);
 
-  const hasActiveFilters = Boolean(search || brandId || stockFilter !== "all");
+  const hasActiveFilters = Boolean(
+    search || brandId || serviceCategoryId || stockFilter !== "all"
+  );
   const lowStockCount = Number(summary.low_stock ?? apiFilters.low_stock) || 0;
   const canFilterLowStock = isCountValue(apiFilters.low_stock);
 
@@ -447,6 +520,7 @@ export default function InventoryVault() {
     setSearch("");
     setSearchInput("");
     setBrandId("");
+    setServiceCategoryId("");
     setStockFilter("all");
     setCurrentPage(1);
   };
@@ -541,6 +615,17 @@ export default function InventoryVault() {
           aria-label="Filter by brand"
           className="w-full sm:w-52"
         />
+        <SelectFilter
+          value={serviceCategoryId}
+          onChange={(e) => {
+            setServiceCategoryId(e.target.value);
+            setCurrentPage(1);
+          }}
+          options={serviceCategoryOptions}
+          placeholder="All service categories"
+          aria-label="Filter by service category"
+          className="w-full sm:w-56"
+        />
       </SearchToolbar>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -591,7 +676,7 @@ export default function InventoryVault() {
           title={hasActiveFilters ? "No matching products" : "No products yet"}
           description={
             hasActiveFilters
-              ? "Try a different product name, brand, or stock filter."
+              ? "Try a different product name, brand, service category, or stock filter."
               : "Start building your catalog by adding your first product."
           }
           action={

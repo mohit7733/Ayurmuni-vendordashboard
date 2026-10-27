@@ -59,11 +59,15 @@ const StatsCards = memo(({ stats, reviews }) => {
     return stars;
   }, []);
 
-  const responseRate = stats.total_reviews > 0
-    ? Math.round((reviews.filter(r => r.doctor_reply).length / stats.total_reviews) * 100)
-    : 0;
 
-  const unansweredCount = reviews.filter(r => r.status === 'active' && !r.doctor_reply).length;
+// Raman
+
+ const responseRate = stats.total_reviews > 0
+  ? Math.round((stats.replied_reviews / stats.total_reviews) * 100)
+  : 0;
+
+const unansweredCount =stats.total_reviews - stats.replied_reviews;
+// Raman
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -73,7 +77,8 @@ const StatsCards = memo(({ stats, reviews }) => {
             <p className="text-sm text-gray-600 font-medium">Average Rating</p>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-2xl font-bold text-gray-900">{stats.average_rating.toFixed(1)}</span>
-              <div className="flex">{renderStars(Math.round(stats.average_rating))}</div>
+              <div className="flex">{renderStars(stats.average_rating)}</div>
+
             </div>
           </div>
           <div className="bg-amber-100 p-3 rounded-full">
@@ -172,7 +177,7 @@ const ReviewCard = memo(({
       {/* Review Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center overflow-hidden flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0D614E] to-[#0a4d3e] text-white flex items-center justify-center overflow-hidden flex-shrink-0">
             {review.reviewer_profile_image ? (
               <img
                 src={review.reviewer_profile_image}
@@ -180,7 +185,7 @@ const ReviewCard = memo(({
                 className="w-full h-full object-cover"
               />
             ) : (
-              <span className="text-emerald-700 font-semibold text-sm">
+              <span className="text-white font-semibold text-sm">
                 {review.reviewer_name?.charAt(0)?.toUpperCase() || 'U'}
               </span>
             )}
@@ -233,76 +238,101 @@ const ReviewCard = memo(({
       </div>
 
       {/* Review Content */}
-      <div className="space-y-2">
-        <p className={`text-gray-700 text-sm ${!isExpanded && review.review?.length > 150 ? 'line-clamp-3' : ''}`}>
-          {review.review || 'No written review provided.'}
-        </p>
-
-        {/* Review Images */}
-        {review.image_urls?.length > 0 && (
-          <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
+      {/* Raman */}
+{isExpanded && ( <div className="space-y-2">
+{/* Review Text */} <p className="text-gray-700 text-sm">
+{review.review || 'No written review provided.'} </p>
+    {/* Review Images */}
+    {review.image_urls?.length > 0 && (
+        <div className="flex gap-2 mt-2 overflow-x-auto pb-2">
             {review.image_urls.map((url, idx) => (
-              <div key={idx} className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200">
-                <img src={url} alt={`Review ${idx + 1}`} className="w-full h-full object-cover" />
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Doctor's Reply */}
-        {hasReply && (
-          <div className="mt-3 bg-gray-50 rounded-lg p-3 border border-gray-100">
-            <div className="flex items-start gap-2">
-              <div className="bg-emerald-100 p-1.5 rounded-full flex-shrink-0">
-                <Reply size={12} className="text-emerald-600" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-gray-700">Your Reply</span>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-gray-400">
-                      {formatDistanceToNow(parseISO(review.doctor_reply_at), { addSuffix: true })}
-                    </span>
-                    <button
-                      onClick={() => {
-                        setSelectedReview(review);
-                        setReplyText(review.doctor_reply);
-                        setEditingReply(review.id);
-                        setShowReplyModal(true);
-                      }}
-                      className="p-1 text-blue-500 hover:bg-blue-50 rounded transition"
-                    >
-                      <Edit2 size={12} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteReply(review.id)}
-                      className="p-1 text-red-400 hover:bg-red-50 rounded transition"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
+                <div
+                    key={idx}
+                    className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200"
+                >
+                    <img
+                        src={url}
+                        alt={`Review ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                    />
                 </div>
-                <p className="text-sm text-gray-700 mt-1">{review.doctor_reply}</p>
-              </div>
-            </div>
-          </div>
-        )}
+            ))}
+        </div>
+    )}
 
-        {/* Reply Button (if expanded and no reply) */}
-        {isExpanded && !hasReply && review.status === 'active' && (
-          <button
+    {/* Doctor's Reply */}
+    {hasReply && (
+        <div className="mt-3 bg-gray-50 rounded-lg p-3 border border-gray-100">
+            <div className="flex items-start gap-2">
+                <div className="bg-emerald-100 p-1.5 rounded-full flex-shrink-0">
+                    <Reply size={12} className="text-emerald-600" />
+                </div>
+
+                <div className="flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-gray-700">
+                            Your Reply
+                        </span>
+
+                        <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-400">
+                                {review.doctor_reply_at
+                                    ? formatDistanceToNow(
+                                          parseISO(review.doctor_reply_at),
+                                          { addSuffix: true }
+                                      )
+                                    : ''}
+                            </span>
+
+                            <button
+                                onClick={() => {
+                                    setSelectedReview(review);
+                                    setReplyText(review.doctor_reply);
+                                    setEditingReply(review.id);
+                                    setShowReplyModal(true);
+                                }}
+                                className="p-1 text-blue-500 hover:bg-blue-50 rounded transition"
+                                title="Edit reply"
+                            >
+                                <Edit2 size={12} />
+                            </button>
+
+                            <button
+                                onClick={() => handleDeleteReply(review.id)}
+                                className="p-1 text-red-400 hover:bg-red-50 rounded transition"
+                                title="Delete reply"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <p className="text-sm text-gray-700 mt-1">
+                        {review.doctor_reply}
+                    </p>
+                </div>
+            </div>
+        </div>
+    )}
+
+    {/* Reply Button */}
+    {!hasReply && review.status === 'active' && (
+        <button
             onClick={() => {
-              setSelectedReview(review);
-              setReplyText('');
-              setShowReplyModal(true);
+                setSelectedReview(review);
+                setReplyText('');
+                setEditingReply(null);
+                setShowReplyModal(true);
             }}
             className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 flex items-center gap-1 font-medium"
-          >
+        >
             <MessageCircle size={14} />
             Reply to this review
-          </button>
-        )}
-      </div>
+        </button>
+    )}
+</div>
+)}
+{/* Raman */}
     </div>
   );
 });
@@ -482,6 +512,7 @@ const DoctorReviews = () => {
         setStats({
           average_rating: response.average_rating || 0,
           total_reviews: response.total_reviews || 0,
+          replied_reviews: response.replied_reviews || 0,
           rating_distribution: response.rating_distribution || {},
           recent_trend: response.recent_trend || 0
         });
@@ -584,10 +615,10 @@ const DoctorReviews = () => {
     rating: [
       { value: 'all', label: 'All Ratings' },
       { value: '5', label: '★★★★★ (5)' },
-      { value: '4', label: '★★★★☆ (4+)' },
-      { value: '3', label: '★★★☆☆ (3+)' },
-      { value: '2', label: '★★☆☆☆ (2+)' },
-      { value: '1', label: '★☆☆☆☆ (1+)' }
+      { value: '4', label: '★★★★☆ (4)' },
+      { value: '3', label: '★★★☆☆ (3)' },
+      { value: '2', label: '★★☆☆☆ (2)' },
+      { value: '1', label: '★☆☆☆☆ (1)' }
     ],
     dateRange: [
       { value: 'all', label: 'All Time' },

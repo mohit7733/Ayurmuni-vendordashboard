@@ -298,14 +298,93 @@ export function parseProductListResponse(response) {
     return Array.isArray(list) ? list : [];
 }
 
+export function normalizeBrand(brand) {
+    if (!brand || typeof brand !== "object") return null;
+    const id = brand.id ?? brand.brand_id ?? brand.brand_name_id;
+    if (id == null || id === "") return null;
+    return {
+        id: String(id),
+        name: brand.name || brand.brand_name || "Untitled brand",
+    };
+}
+
+export function getServiceCategory(item) {
+    const category = item?.service_category;
+    const name = (
+        item?.service_category_name ||
+        (category && typeof category === "object" ? category.name : "") ||
+        ""
+    ).trim();
+    if (!name) return null;
+    const id =
+        item?.service_category_id ??
+        item?.service_categoryId ??
+        (category && typeof category === "object"
+            ? category.id ?? category.pk
+            : category) ??
+        item?.id;
+    return {
+        id: id == null || id === "" ? "" : String(id),
+        name,
+    };
+}
+
+export function getServiceCategoryName(item) {
+    return getServiceCategory(item)?.name || "";
+}
+
+export function uniqueServiceCategories(items = []) {
+    return Array.from(
+        new Map(
+            items
+                .map(getServiceCategory)
+                .filter(Boolean)
+                .map((category) => [
+                    category.id || category.name.toLowerCase(),
+                    category,
+                ])
+        ).values()
+    ).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Match product to brand filter (API uses brand_name_id / brand_id). */
+export function productMatchesBrand(product, brandId) {
+    if (!brandId) return true;
+    const id = String(product?.brand_name_id ?? product?.brand_id ?? "");
+    return id === String(brandId);
+}
+
+export function productMatchesServiceCategory(product, serviceCategory) {
+    if (!serviceCategory) return true;
+    const selected =
+        typeof serviceCategory === "object"
+            ? serviceCategory
+            : { id: serviceCategory, name: serviceCategory };
+    // Products expose service_category_id / service_category_name; do not
+    // fall back to product.id here (that is the product's own id).
+    const category = product?.service_category;
+    const dedicatedId =
+        product?.service_category_id ??
+        product?.service_categoryId ??
+        (category && typeof category === "object"
+            ? category.id ?? category.pk
+            : category);
+    if (selected.id && dedicatedId != null && dedicatedId !== "") {
+        return String(dedicatedId) === String(selected.id);
+    }
+    const selectedName = String(selected.name || "").trim();
+    if (!selectedName) return true;
+    return getServiceCategoryName(product).toLowerCase() === selectedName.toLowerCase();
+}
+
 /** Load the full vendor catalog so variant approval_status is complete (not just first page). */
-export async function fetchAllVendorProducts(vendorService, pageSize = 100000) {
+export async function fetchAllVendorProducts(vendorService, pageSize = 100000, brandId = null) {
     let page = 1;
     let all = [];
     let total = Infinity;
 
     while (all.length < total) {
-        const response = await vendorService.getProducts({ page, page_size: pageSize });
+        const response = await vendorService.getProducts({ page, page_size: pageSize, brand_id: brandId });
         const data = response?.data?.data;
         const results = parseProductListResponse(response);
         total = typeof data?.count === "number" ? data.count : results.length;

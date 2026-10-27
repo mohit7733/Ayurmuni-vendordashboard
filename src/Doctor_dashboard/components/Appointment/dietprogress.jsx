@@ -206,7 +206,7 @@ const DietProgress = ({ patientId }) => {
             const response = await doctorService.getprescribedietplan(patientId);
             setPlans(unwrapPlans(response));
         } catch (error) {
-            toast.error(error?.message || "Failed to load assigned diet plans");
+            // toast.error(error?.message || "Failed to load assigned diet plans");
             setPlans([]);
         } finally {
             setLoading(false);

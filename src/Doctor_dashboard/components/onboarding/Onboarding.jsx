@@ -5,7 +5,8 @@ import {
     AlertCircle, ChevronRight, ChevronLeft, Trash2, Eye, FileCheck,
     Stethoscope, Award, X, RefreshCw, Check, Clock, Users, Banknote,
     Linkedin, Twitter, Facebook, Instagram, Globe, Building, Home,
-    Shield, Info, ArrowLeft, Sparkles
+    Shield, Info, ArrowLeft, Sparkles,
+    LogOut
 } from 'lucide-react';
 import { doctorService } from '../../../services/doctorService';
 import { acceptLegalPolicies } from '../../../services/policyService';
@@ -221,19 +222,32 @@ const FormInput = ({ label, name, value, onChange, error, required, placeholder,
         <label className="block text-sm font-medium text-gray-700 mb-1">
             {label} {required && <span className="text-rose-500">*</span>}
         </label>
+
         <input
             type={type}
             name={name}
             value={value}
-            onChange={onChange}
+            onChange={(e) => {
+                if (type === "number" && Number(e.target.value) < 0) return;
+                onChange(e);
+            }}
+            onKeyDown={(e) => {
+                if (type === "number" && ["-", "e", "E"].includes(e.key)) {
+                    e.preventDefault();
+                }
+            }}
             placeholder={placeholder}
             maxLength={max}
             max={max}
+            min={type === "number" ? 0 : undefined}
             disabled={disabled}
-            className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${error ? 'border-rose-500 focus:ring-rose-500 bg-rose-50' : 'border-gray-200 focus:ring-[#0D614E]'
+            className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${error
+                ? "border-rose-500 focus:ring-rose-500 bg-rose-50"
+                : "border-gray-200 focus:ring-[#0D614E]"
                 }`}
             {...props}
         />
+
         {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
     </div>
 );
@@ -250,7 +264,7 @@ const FormSelect = ({ label, name, value, onChange, error, required, options, pl
             className={`w-full px-4 py-2.5 border rounded-xl capitalize focus:outline-none focus:ring-2 transition-all ${error ? 'border-rose-500 focus:ring-rose-500 bg-rose-50' : 'border-gray-200 focus:ring-[#0D614E]'
                 }`}
         >
-            <option value="">{placeholder || `Select ${label}`}</option>
+            <option value="" disabled>{placeholder || `Select ${label}`}</option>
 
             {
                 (name === "primaryDosha" || name === "primarydisease")
@@ -364,7 +378,9 @@ const ChipInput = ({ label, items, onAdd, onRemove, options, error, placeholder 
                     className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${error ? 'border-rose-500 focus:ring-rose-500 bg-rose-50' : 'border-gray-200 focus:ring-[#0D614E]'
                         }`}
                 >
-                    <option value="">{placeholder}</option>
+                    <option value="" disabled>
+                        {placeholder}
+                    </option>
                     {options?.filter(opt => !items.includes(opt.id)).map(opt => (
                         <option key={opt} value={opt.id}>{opt.name}</option>
                     ))}
@@ -374,7 +390,9 @@ const ChipInput = ({ label, items, onAdd, onRemove, options, error, placeholder 
                     className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${error ? 'border-rose-500 focus:ring-rose-500 bg-rose-50' : 'border-gray-200 focus:ring-[#0D614E]'
                         }`}
                 >
-                    <option value="">{placeholder}</option>
+                    <option value="" disabled>
+                        {placeholder}
+                    </option>
                     {options?.filter(opt => !items.includes(opt)).map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
                     ))}
@@ -755,12 +773,31 @@ const DoctorOnboarding = () => {
 
     // ==================== RENDER ====================
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 relative">
             <SuccessModal show={showSuccess} />
-
+            <button
+                type="button"
+                onClick={() => {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.location.href = "/login";
+                }}
+                className="mt-8 inline-flex items-center gap-2 px-4 py-2
+                bg-white text-[#0D614E] font-semibold rounded-xl
+                hover:bg-emerald-50 transition-all duration-200
+                shadow-md"
+                style={{
+                    position: 'absolute',
+                    right: '20px',
+                    top: "-10px",
+                }}
+            >
+                <LogOut size={18} />
+                Logout
+            </button>
             {/* Header */}
-            <div className="bg-gradient-to-r from-[#0D614E] to-[#0a4d3e] text-white pb-10">
-                <div className="max-w-6xl mx-auto px-8 py-12">
+            <div className="bg-gradient-to-r from-[#0D614E] to-[#0a4d3e] text-white pb-10 ">
+                <div className="max-w-6xl mx-auto px-8 py-12 relative">
                     <div className="text-center">
                         <div className="inline-flex items-center justify-center w-20 h-20 bg-white bg-opacity-20 rounded-full mb-4">
                             <Stethoscope size={40} />
@@ -772,6 +809,7 @@ const DoctorOnboarding = () => {
                             <div className="text-center"><p className="text-2xl font-bold text-white">10k+</p><p className="text-xs text-emerald-100">Happy Patients</p></div>
                             <div className="text-center"><p className="text-2xl font-bold text-white">24/7</p><p className="text-xs text-emerald-100">Support</p></div>
                         </div>
+
                     </div>
                 </div>
             </div>
@@ -861,7 +899,7 @@ const DoctorOnboarding = () => {
 
                                         <FormInput label="Alternate Number" max={10} name="alternatePhone" value={formData.contactInfo.alternatePhone}
                                             onChange={(e) => handleInputChange('contactInfo', 'alternatePhone', e.target.value)}
-                                            error={errors.alternatePhone} placeholder="Optional" type="tel" />
+                                            error={errors.alternatePhone} placeholder="Optional" type="number" />
 
                                         <div className="md:col-span-2">
                                             <FormInput label="Street Address" name="street" value={formData.contactInfo.address.street}
@@ -887,7 +925,7 @@ const DoctorOnboarding = () => {
 
                                         <SectionDivider title="Emergency Contact" />
 
-                                        <FormInput label="Emergency Contact Name" max={10} name="emergencyName" value={formData.contactInfo.emergencyContact.name}
+                                        <FormInput label="Emergency Contact Name" name="emergencyName" value={formData.contactInfo.emergencyContact.name}
                                             onChange={(e) => handleNestedInputChange('contactInfo', 'emergencyContact', 'name', e.target.value)}
                                             placeholder="Enter emergency contact name" />
 
@@ -949,7 +987,7 @@ const DoctorOnboarding = () => {
                                             error={errors.consultationFee} required type="number" placeholder="Amount in INR" />
 
                                         <FormInput label="Follow-up Fee (₹)" name="followUpFee" value={formData.professionalInfo.followUpFee}
-                                            onChange={(e) => handleInputChange('professionalInfo', 'followUpFee', e.target.value)}
+                                            onChange={(e) => handleInputChange('professionalInfo', 'followUpFee', (e.target.value))}
                                             type="number" placeholder="Amount in INR" />
 
                                         <FormInput label="Average Consultation Time (minutes)" name="averageConsultationTime" value={formData.professionalInfo.averageConsultationTime}

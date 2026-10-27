@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Clock, Plus, Trash2, Edit2, Coffee, Save, AlertCircle, IndianRupee } from 'lucide-react';
 import { format, isPast, isToday } from 'date-fns';
 import toast from 'react-hot-toast';
+import { getApiErrorMessage } from '../hooks/useCalendarData';
 
 const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpdate, baseamount, adminamount }) => {
     const [slots, setSlots] = useState([]);
@@ -171,6 +172,22 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
                 return false;
             }
 
+            // The backend rejects past slots with 400 "Past time slot cannot
+            // be created.", and time can pass between picking a time and
+            // clicking Save — so re-check here, at submit time, not only when
+            // the time input changes. Only slots actually being sent (new or
+            // modified) are checked: an untouched slot from earlier today
+            // must not block editing a later slot for the same day.
+            if (slot.is_new || slot.is_modified) {
+                const [startHours, startMinutes] = slot.start_time.split(':').map(Number);
+                const slotDateTime = new Date(selectedDate);
+                slotDateTime.setHours(startHours, startMinutes, 0, 0);
+                if (slotDateTime <= new Date()) {
+                    toast.error(`Slot ${i + 1}: Past time slot cannot be created. Please select a future time.`);
+                    return false;
+                }
+            }
+
             const diff = getMinutesDifference(slot.start_time, slot.end_time);
             if (diff < 30) {
                 toast.error(`Slot ${i + 1}: Minimum slot duration must be 30 minutes`);
@@ -282,7 +299,7 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
                         slots: formattedNewSlots,
                     }]
                 });
-                toast.success(`${formattedNewSlots.length} new slot(s) added successfully`);
+                // toast.success(`${formattedNewSlots.length} new slot(s) added successfully`);
             }
 
             if (modifiedSlots.length > 0 && onUpdate) {
@@ -311,11 +328,11 @@ const SlotDrawer = ({ isOpen, selectedDate, editingSlot, onClose, onSave, onUpda
 
         } catch (error) {
             console.error("Slot submit error:", error);
-            const errorMessage = error?.response?.data?.message ||
-                error?.response?.data?.detail ||
-                error?.message ||
-                "Something went wrong while saving slots";
-            toast.error(errorMessage);
+            // useCalendarData already toasted the specific backend message
+            // (e.g. "Past time slot cannot be created.") — don't toast twice.
+            if (!error?.toastShown) {
+                toast.error(getApiErrorMessage(error, "Something went wrong while saving slots"));
+            }
         } finally {
             setIsLoading(false);
         }
@@ -500,12 +517,13 @@ const SlotEditorCard = ({ slot, index, selectedDate, isEditing, onEdit, onSave, 
         if (!isToday) return false;
         if (!time) return true;
 
+        // Compare full datetimes, not just HH:MM — at 18:04:45 a "18:04"
+        // slot (18:04:00) is already in the past for the backend, even
+        // though the hour/minute look equal to the current time.
         const [hours, minutes] = time.split(':').map(Number);
-        const [currentHours, currentMinutes] = currentTime.split(':').map(Number);
-
-        if (hours < currentHours) return true;
-        if (hours === currentHours && minutes < currentMinutes) return true;
-        return false;
+        const slotDateTime = new Date(selectedDate);
+        slotDateTime.setHours(hours, minutes, 0, 0);
+        return slotDateTime <= new Date();
     };
 
     const getMinutesDifference = (startTime, endTime) => {
