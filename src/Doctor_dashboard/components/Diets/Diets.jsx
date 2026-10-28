@@ -83,16 +83,6 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
         setLoading(true);
         setError('');
         const next = url?.split("page=")?.[1] ? url?.split("page=")?.[1]?.split("&")?.[0] : url?.split("page=")?.[1] || 1;
-        console.log(
-            {
-                url,
-                next,
-                search: search.trim(),
-                season: seasonFilter,
-                is_paid: typeFilter,
-                is_common: visibilityFilter
-            }
-        );
         try {
             // const response = await doctorService.getdiet(next);
             const filtereddata = await doctorService.getdietbysearch({
@@ -178,18 +168,9 @@ const DietPlanList = ({ onEdit, onCreateNew }) => {
     };
 
     const filteredPlans = plans.filter((plan) => {
-        // if (search.trim()) {
-        //     const q = search.trim().toLowerCase();
-        //     const matchesName = plan.name?.toLowerCase().includes(q);
-        //     const matchesDisease = plan.health_diseases?.some((d) => d.name?.toLowerCase().includes(q));
-        //     if (!matchesName && !matchesDisease) return false;
-        // }
-        // if (seasonFilter !== 'all' && plan.season !== seasonFilter) return false;
-        // if (typeFilter === 'paid' && !plan.is_paid) return false;
-        // if (typeFilter === 'free' && plan.is_paid) return false;
-        // if (visibilityFilter === 'common' && !plan.is_common) return false;
-        // if (visibilityFilter === 'personal' && plan.is_common) return false;
-        return true;
+        if (statusFilter === 'all') return true;
+        const isActive = plan.is_active ?? true;
+        return statusFilter === 'active' ? isActive : !isActive;
     });
 
     const seasons = ['summer', 'winter', 'spring', 'autumn', 'monsoon'];

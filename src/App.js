@@ -81,9 +81,9 @@ const VIDEO_RND_CANCEL =
 
 function getVideoWindowFrame() {
   if (typeof window === "undefined") {
-    return { x: 24, y: 16, width: 350, height: 550 };
+    return { x: 24, y: 16, width: 400, height: 550 };
   }
-  const width = Math.min(350, Math.max(280, window.innerWidth - 16));
+  const width = Math.min(400, Math.max(280, window.innerWidth - 16));
   const height = Math.min(550, Math.max(360, window.innerHeight - 24));
   return {
     width,

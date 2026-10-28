@@ -774,7 +774,7 @@ const DoctorReviews = () => {
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
                 Status: {filters.status}
                 <button onClick={() => setFilters({ ...filters, status: 'active' })} className="hover:text-red-500">
-                  <XCircle size={12} />
+                  <XCircle size={15} />
                 </button>
               </span>
             )}
@@ -782,7 +782,7 @@ const DoctorReviews = () => {
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
                 Rating: {filters.rating}★
                 <button onClick={() => setFilters({ ...filters, rating: 'all' })} className="hover:text-red-500">
-                  <XCircle size={12} />
+                  <XCircle size={15} />
                 </button>
               </span>
             )}
@@ -790,7 +790,7 @@ const DoctorReviews = () => {
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
                 Search: {filters.searchQuery}
                 <button onClick={() => setFilters({ ...filters, searchQuery: '' })} className="hover:text-red-500">
-                  <XCircle size={12} />
+                  <XCircle size={15} />
                 </button>
               </span>
             )}

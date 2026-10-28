@@ -1044,6 +1044,9 @@ export const doctorService = {
             if (filters.season !== undefined && filters.season !== null && filters.season !== "") {
                 query.append("season", filters.season);
             }
+            if (filters.is_active !== undefined && filters.is_active !== null) {
+                query.append("is_active", filters.is_active);
+            }
         }
 
         const queryString = query.toString();

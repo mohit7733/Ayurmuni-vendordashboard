@@ -562,7 +562,7 @@ const AppointmentsPage = () => {
                     patient_name: apt.patient_name || 'Unknown Patient',
                     patient_prakriti: apt.prakriti,
                     day: apt.day,
-                    call_status:apt.call_status
+                    call_status: apt.call_status
                 }));
                 setAppointments(appointmentsData);
                 setTotalItems(response.data.data.count ?? appointmentsData.length);
@@ -600,7 +600,7 @@ const AppointmentsPage = () => {
         // } catch (error) {
         //     toast.error('Failed to load appointments');
         // }
-    }, [currentPage, itemsPerPage, searchbydate, statusFilter]);
+    }, [currentPage, searchTerm, itemsPerPage, searchbydate, statusFilter]);
 
     useEffect(() => {
         fetchAppointments();
@@ -763,31 +763,31 @@ const AppointmentsPage = () => {
     };
 
 
-const getCallStatus = (appointment) => {
-    if (appointment.status !== "confirmed") {
-        return null;
-    }
+    const getCallStatus = (appointment) => {
+        if (appointment.status !== "confirmed") {
+            return null;
+        }
 
-    const startDateTime = new Date(
-        `${appointment.appointment_date}T${appointment.start_time}`
-    );
+        const startDateTime = new Date(
+            `${appointment.appointment_date}T${appointment.start_time}`
+        );
 
-    const endDateTime = new Date(
-        `${appointment.appointment_date}T${appointment.end_time}`
-    );
+        const endDateTime = new Date(
+            `${appointment.appointment_date}T${appointment.end_time}`
+        );
 
-    const now = new Date();
+        const now = new Date();
 
-    if (now >= startDateTime && now < endDateTime) {
-        return "live";
-    }
+        if (now >= startDateTime && now < endDateTime) {
+            return "live";
+        }
 
-    if (now >= endDateTime) {
-        return "ended";
-    }
+        if (now >= endDateTime) {
+            return "ended";
+        }
 
-    return "upcoming";
-};
+        return "upcoming";
+    };
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -825,7 +825,7 @@ const getCallStatus = (appointment) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
                     <StatCard title="Total Appointments" value={stats.total} icon={CalendarIcon} iconBg="bg-emerald-50" iconColor="text-[#0D614E]" />
                     <StatCard title="Today's Appointments" value={stats.today} icon={Clock} iconBg="bg-yellow-50" iconColor="text-yellow-600" />
-                    <StatCard title="Confirmed" value={stats.confirmed} icon={CheckCircle} iconBg="bg-blue-50" iconColor="text-blue-600" />
+                    <StatCard title="Confirmed" value={stats.confirmed} icon={CheckCheck} iconBg="bg-blue-50" iconColor="text-blue-600" />
                     <StatCard title="Rescheduled" value={stats.rescheduled} icon={RefreshCw} iconBg="bg-orange-50" iconColor="text-orange-600" />
                     <StatCard title="Completed" value={stats.completed} icon={CheckCheck} iconBg="bg-green-50" iconColor="text-green-600" />
                 </div>
@@ -839,8 +839,8 @@ const getCallStatus = (appointment) => {
                                 <input
                                     type="text"
                                     placeholder="Search by patient name, concern, or notes..."
-                                    value={searchTerm}
-                                    onChange={(e) => {
+                                    defaultValue={searchTerm}
+                                    onBlur={(e) => {
                                         setSearchTerm(e.target.value);
                                         setCurrentPage(1);
                                     }}
@@ -1006,7 +1006,7 @@ const getCallStatus = (appointment) => {
                                                 (appointmentDateTime.getTime() - now.getTime()) / (1000 * 60);
 
                                             const canTakeAction = minutesUntilAppointment > 30;
-                                            return(
+                                            return (
                                                 <tr key={appointment.id} className="hover:bg-gray-50 transition-colors">
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col">
@@ -1047,35 +1047,35 @@ const getCallStatus = (appointment) => {
                                                             {appointment.concern?.length > 40 && '...'}
                                                         </span>
                                                     </td>
-                                                    {console.log(appointment.call_status,new Date(appointment.appointment_date).getDate() < new Date()?.getDate())
-                                                    }
+                                                    {/* {console.log(appointment.call_status, new Date(appointment.appointment_date).getDate() < new Date()?.getDate())
+                                                    } */}
 
-<td className="px-6 py-4">
-    <StatusBadge status={appointment.status} />
+                                                    <td className="px-6 py-4">
+                                                        <StatusBadge status={appointment.status} />
 
-    {appointment.status === "confirmed" && getCallStatus(appointment) === "live" && (
-        <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full animate-pulse">
-            <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-            Live
-        </span>
-    )}
+                                                        {appointment.status === "confirmed" && getCallStatus(appointment) === "live" && (
+                                                            <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full animate-pulse">
+                                                                <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                                                                Live
+                                                            </span>
+                                                        )}
 
-    {appointment.status === "confirmed" && getCallStatus(appointment) === "ended" && (
-        <div className="mt-2 flex items-center gap-2">
-            <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
-                Call Ended
-            </span>
-           <Link
-                                                                to={`appointment/${appointment.id}`}
-                                                                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-                                                                title="View Details"
-                className="px-3 py-1 text-xs rounded-md bg-green-600 text-white hover:bg-green-700"
-            >
-                Fill Prescription
-            </Link>
-        </div>
-    )}
-</td>
+                                                        {appointment.status === "confirmed" && getCallStatus(appointment) === "ended" && (
+                                                            <div className="mt-2 flex items-center gap-2">
+                                                                <span className="inline-flex items-center px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
+                                                                    Call Ended
+                                                                </span>
+                                                                <Link
+                                                                    to={`appointment/${appointment.id}`}
+                                                                    className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                                                                    title="View Details"
+                                                                    className="px-3 py-1 text-xs rounded-md bg-green-600 text-white hover:bg-green-700"
+                                                                >
+                                                                    Fill Prescription
+                                                                </Link>
+                                                            </div>
+                                                        )}
+                                                    </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex items-center gap-1 shrink-0">
                                                             <Link

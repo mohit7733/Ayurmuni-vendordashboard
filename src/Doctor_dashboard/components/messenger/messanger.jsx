@@ -32,7 +32,7 @@ import {
     getChatSyncChannel,
     apiErrorMessage,
 } from '../../../services/consultationChatService';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 const CHAT_SENDER_DOCTOR = 'doctor';
 const CHAT_SENDER_PATIENT = 'patient';
@@ -320,6 +320,8 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
     const tabIdRef = useRef(`tab-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     const listRefreshTimerRef = useRef(null);
     const { patientId } = useParams();
+    const navigate = useNavigate();
+
 
     const isActivePatient = useCallback(
         (patientId) => normalizePatientId(selectedPatientRef.current?.patientId)
@@ -947,7 +949,8 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
                                 }
                                 onClick={() => {
                                     if (patientId) {
-                                        window.location.replace(`/doctor/messenger`)
+                                        // window.location.replace(`/doctor/messenger/` + selectedPatient?.patientId)
+                                        navigate(`/doctor/messenger/${patient.patientId}`);
                                     }
                                     handlePatientSelect(patient)
                                 }}
@@ -1089,7 +1092,7 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
                         </div>
                     </div>
                 </div>
-                            ) : (
+            ) : (
                 <div className="flex flex-1 min-w-0 min-h-[280px]">
                     {renderEmptyState()}
                 </div>
