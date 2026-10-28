@@ -562,7 +562,9 @@ const AppointmentsPage = () => {
                     patient_name: apt.patient_name || 'Unknown Patient',
                     patient_prakriti: apt.prakriti,
                     day: apt.day,
-                    call_status: apt.call_status
+                    call_status: apt.call_status,
+                    cancelled_by: apt.cancelled_by,
+                    cancellation_reason: apt.cancellation_reason
                 }));
                 setAppointments(appointmentsData);
                 setTotalItems(response.data.data.count ?? appointmentsData.length);
@@ -1053,10 +1055,36 @@ const AppointmentsPage = () => {
                                                     <td className="px-6 py-4">
                                                         <StatusBadge status={appointment.status} />
 
+                                                        {appointment.status === "cancelled" && (
+                                                            <div className="ml-2 inline-flex flex-col gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                                                                {appointment?.cancelled_by && (
+                                                                    <span className="text-xs text-gray-600">
+                                                                        By: {appointment?.cancelled_by}
+                                                                    </span>
+                                                                )}
+
+                                                                {appointment?.cancellation_reason && (
+                                                                    <span className="text-xs text-gray-600">
+                                                                        Reason: {appointment?.cancellation_reason}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+
                                                         {appointment.status === "confirmed" && getCallStatus(appointment) === "live" && (
                                                             <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full animate-pulse">
                                                                 <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
                                                                 Live
+                                                            </span>
+                                                        )}
+
+                                                        
+
+
+                                                        {appointment.status === "confirmed" && getCallStatus(appointment) === "upcoming" && (
+                                                            <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full animate-pulse">
+                                                                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
+                                                                Upcoming
                                                             </span>
                                                         )}
 
