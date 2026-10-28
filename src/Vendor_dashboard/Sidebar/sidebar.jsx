@@ -39,7 +39,7 @@ const MENU_ITEMS = [
   { name: "Orders", icon: ShoppingCart, path: "/vendor/orders", match: ["/vendor/orders", "/vendor/customers"] },
   { name: "Finance", icon: Wallet, path: "/vendor/finance", match: ["/vendor/finance"], soon: true },
   { name: "Ratings", icon: Star, path: "/vendor/ratings" },
-  { name: "Analytics", icon: BarChart3, path: "/vendor/analytics", soon: true },
+  { name: "Analytics", icon: BarChart3, path: "/vendor/analytics" },
   { name: "Coupons", icon: Tag, path: "/vendor/coupons", soon: true },
 ];
 

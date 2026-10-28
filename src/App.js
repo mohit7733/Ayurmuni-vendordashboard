@@ -52,6 +52,9 @@ const VendorProfile = lazy(() => import("./Vendor_dashboard/Pages/Profile/Profil
 const VendorStock = lazy(() => import("./Vendor_dashboard/Pages/Stock/Stock"));
 const VendorBanners = lazy(() => import("./Vendor_dashboard/Pages/Banners/Banners"));
 const VendorCatalog = lazy(() => import("./Vendor_dashboard/Pages/Catalog/Catalog"));
+const VendorCategories = lazy(() => import("./Vendor_dashboard/Pages/Categories/Categories"));
+const VendorBrands = lazy(() => import("./Vendor_dashboard/Pages/Brands/Brands"));
+const VendorAnalytics = lazy(() => import("./Vendor_dashboard/Pages/Analytics/Analytics"));
 const VendorHelpSupport = lazy(() => import("./Vendor_dashboard/Pages/HelpSupport/HelpSupport"));
 const VendorRatings = lazy(() => import("./Vendor_dashboard/Pages/Ratings/Ratings"));
 const ForgotPassword = lazy(() => import("./Vendor_dashboard/Auth/ForgotPassword"));
@@ -70,14 +73,6 @@ const ComingSoonFinance = () => (
     title="Finance"
     description="Earnings, settlements, and payouts will be available here."
     backendNote="Finance is coming soon. We'll enable this section once payout APIs are ready."
-  />
-);
-
-const ComingSoonAnalytics = () => (
-  <UnavailableFeature
-    title="Analytics"
-    description="Sales and performance insights will be available here."
-    backendNote="Analytics is coming soon. Charts and reports will appear once this module is enabled."
   />
 );
 
@@ -273,6 +268,8 @@ function App() {
                 <Route path="stock" element={<VendorStock />} />
                 <Route path="banners" element={<VendorBanners />} />
                 <Route path="catalog" element={<VendorCatalog />} />
+                <Route path="categories" element={<VendorCategories />} />
+                <Route path="brands" element={<VendorBrands />} />
                 <Route path="new-product" element={<AddProduct />} />
                 <Route path="bulk-upload-products" element={<BulkUploadProducts />} />
                 <Route path="image-links" element={<VendorImagesGeneration />} />
@@ -283,7 +280,7 @@ function App() {
                 <Route path="finance/wallet" element={<ComingSoonFinance />} />
                 <Route path="finance/settlements" element={<ComingSoonFinance />} />
                 <Route path="finance/withdrawals" element={<ComingSoonFinance />} />
-                <Route path="analytics" element={<ComingSoonAnalytics />} />
+                <Route path="analytics" element={<VendorAnalytics />} />
                 <Route path="customers" element={<Navigate to="/vendor/orders?view=customers" replace />} />
                 <Route path="customers/:id" element={<CustomerDetail />} />
                 <Route path="coupons" element={<ComingSoonCoupons />} />

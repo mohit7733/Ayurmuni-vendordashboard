@@ -1965,7 +1965,7 @@ const AppointmentDetail = ({ videodetails }) => {
 
                                     {/* {console.log(isCallTime)} */}
 
-                                    {appointment?.status === "confirmed" &&  (
+                                    {appointment?.status === "confirmed"  || appointment?.status === "rescheduled" && (
                                         <button
                                             onClick={() => {
                                                 videodetails({
@@ -2085,7 +2085,7 @@ const AppointmentDetail = ({ videodetails }) => {
 
                                 {/* Prescription Tab */}
                                 {activeTab === 'prescription' && (
-                                    appointment?.status == "confirmed" || editingPrescriptionId
+                                    appointment?.status == "confirmed" || appointment?.status === "rescheduled"|| editingPrescriptionId
                                         // || appointment?.status == "completed"
                                         ?
                                         <div className="space-y-6">
