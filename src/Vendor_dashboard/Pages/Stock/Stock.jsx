@@ -287,7 +287,7 @@ export default function StockManagement() {
     const [searchInput, setSearchInput] = useState("");
     const [productFilter, setProductFilter] = useState("");
     const [brandId, setBrandId] = useState("");
-    const [serviceCategoryName, setServiceCategoryName] = useState("");
+    const [serviceCategoryId, setServiceCategoryId] = useState("");
     const [brands, setBrands] = useState([]);
     const [serviceCategories, setServiceCategories] = useState([]);
     const [stockFilter, setStockFilter] = useState("all");
@@ -308,9 +308,9 @@ export default function StockManagement() {
     const inventoryRequestRef = useRef(0);
     const countsRequestRef = useRef(0);
 
-    const hasActiveQuery = Boolean(search || productFilter || brandId || serviceCategoryName);
+    const hasActiveQuery = Boolean(search || productFilter || brandId || serviceCategoryId);
     const hasActiveFilters = Boolean(
-        search || searchInput || productFilter || brandId || serviceCategoryName || stockFilter !== "all"
+        search || searchInput || productFilter || brandId || serviceCategoryId || stockFilter !== "all"
     );
 
     const brandOptions = useMemo(
@@ -319,8 +319,22 @@ export default function StockManagement() {
     );
 
     const serviceCategoryOptions = useMemo(
-        () => serviceCategories.map((name) => ({ value: name, label: name })),
+        () =>
+            serviceCategories.map((category) => ({
+                value: category.id || category.name,
+                label: category.name,
+            })),
         [serviceCategories]
+    );
+
+    // Local product list is matched by the selected category object
+    // (id and/or name); the API below receives only the id.
+    const selectedServiceCategory = useMemo(
+        () =>
+            serviceCategories.find(
+                (category) => (category.id || category.name) === serviceCategoryId
+            ) || serviceCategoryId,
+        [serviceCategories, serviceCategoryId]
     );
 
     const productOptions = useMemo(
@@ -329,10 +343,10 @@ export default function StockManagement() {
                 .filter(
                     (product) =>
                         productMatchesBrand(product, brandId) &&
-                        productMatchesServiceCategory(product, serviceCategoryName)
+                        productMatchesServiceCategory(product, selectedServiceCategory)
                 )
                 .map((product) => ({ value: product.id, label: product.name })),
-        [products, brandId, serviceCategoryName]
+        [products, brandId, selectedServiceCategory]
     );
 
     const fetchProducts = useCallback(async (forceRefresh = false) => {
@@ -371,9 +385,9 @@ export default function StockManagement() {
             search: search || undefined,
             product_id: productFilter || undefined,
             brand_id: brandId || undefined,
-            service_category_name: serviceCategoryName || undefined,
+            service_category_id: serviceCategoryId || undefined,
         }),
-        [search, productFilter, brandId, serviceCategoryName]
+        [search, productFilter, brandId, serviceCategoryId]
     );
 
     const fetchCounts = useCallback(async () => {
@@ -593,7 +607,7 @@ export default function StockManagement() {
         setSearchInput("");
         setProductFilter("");
         setBrandId("");
-        setServiceCategoryName("");
+        setServiceCategoryId("");
         setStockFilter("all");
         setPage(1);
     };
@@ -746,9 +760,9 @@ export default function StockManagement() {
                     className="w-[11rem] min-w-[9rem] shrink-0"
                 />
                 <SelectFilter
-                    value={serviceCategoryName}
+                    value={serviceCategoryId}
                     onChange={(e) => {
-                        setServiceCategoryName(e.target.value);
+                        setServiceCategoryId(e.target.value);
                         setPage(1);
                     }}
                     options={serviceCategoryOptions}

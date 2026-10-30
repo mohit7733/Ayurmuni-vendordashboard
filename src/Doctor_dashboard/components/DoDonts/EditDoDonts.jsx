@@ -334,11 +334,10 @@ const EditDoDonts = () => {
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 {message.text && (
                     <div
-                        className={`flex items-start gap-2.5 p-3.5 rounded-lg mb-5 border ${
-                            message.type === "success"
+                        className={`flex items-start gap-2.5 p-3.5 rounded-lg mb-5 border ${message.type === "success"
                                 ? "bg-green-50 border-green-200 text-green-700"
                                 : "bg-red-50 border-red-200 text-red-700"
-                        }`}
+                            }`}
                     >
                         {message.type === "success" ? (
                             <CheckCircle2 size={18} className="shrink-0 mt-0.5" />
@@ -386,27 +385,30 @@ const EditDoDonts = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                     Health Conditions <span className="text-red-500">*</span>
                                 </label>
-                                <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
-                                    {formData.health_diseases.map((disease, index) => (
-                                        <span
-                                            key={disease.id}
-                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
-                                        >
-                                            {disease.name}
-                                            <button
-                                                type="button"
-                                                onClick={() => removeDisease(index)}
-                                                className="hover:text-blue-900"
-                                                aria-label={`Remove ${disease.name}`}
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </span>
-                                    ))}
-                                    {formData.health_diseases.length === 0 && (
+                                {
+                                    formData.health_diseases.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 mb-2 min-h-[28px]">
+                                            {formData.health_diseases.map((disease, index) => (
+                                                <span
+                                                    key={disease.id}
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100"
+                                                >
+                                                    {disease.name}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeDisease(index)}
+                                                        className="hover:text-blue-900"
+                                                        aria-label={`Remove ${disease.name}`}
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </span>
+                                            ))}
+                                            {/* {formData.health_diseases.length === 0 && (
                                         <span className="text-xs text-gray-400">No conditions added yet</span>
-                                    )}
-                                </div>
+                                    )} */}
+                                        </div>)
+                                }
                                 {/* <input
                                     type="text"
                                     value={diseaseQuery}

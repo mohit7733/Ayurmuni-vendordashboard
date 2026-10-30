@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
     Users,
     Search,
@@ -37,6 +37,67 @@ import { doctorService } from '../../../services/doctorService';
 import { BiFemale, BiMale, BiUser } from 'react-icons/bi';
 import { Link } from 'react-router-dom';
 
+const PRAKRITI_PARTS = ['vata', 'pitta', 'kapha'];
+
+const stringifyPrakriti = (raw, depth = 0) => {
+    if (depth > 4 || raw == null) return '';
+    if (typeof raw === 'string' || typeof raw === 'number') return String(raw);
+    if (Array.isArray(raw)) {
+        return raw.map((item) => stringifyPrakriti(item, depth + 1)).filter(Boolean).join(' ');
+    }
+    if (typeof raw === 'object') {
+        return stringifyPrakriti(raw.result ?? raw.name ?? raw.label ?? raw.value ?? '', depth + 1);
+    }
+    return '';
+};
+
+const extractPrakritiText = (patient) => stringifyPrakriti(
+    patient?.prakriti_result ?? patient?.prakriti ?? patient?.dosha ?? ''
+);
+
+const prakritiKey = (value) => {
+    const parts = String(value || '')
+        .toLowerCase()
+        .split(/[^a-z]+/)
+        .filter((part) => PRAKRITI_PARTS.includes(part));
+    return [...new Set(parts)].sort().join('-');
+};
+
+const matchesPrakriti = (patient, filter) => {
+    if (!filter || filter === 'all') return true;
+    const patientKey = prakritiKey(extractPrakritiText(patient));
+    return patientKey !== '' && patientKey === prakritiKey(filter);
+};
+
+const matchesGender = (patient, filter) => {
+    if (!filter || filter === 'all') return true;
+    const value = String(patient?.gender || '').trim().toLowerCase();
+    if (filter === 'male') return value === 'male' || value === 'm';
+    if (filter === 'female') return value === 'female' || value === 'f';
+    if (filter === 'other') {
+        return Boolean(value) && !['male', 'm', 'female', 'f'].includes(value);
+    }
+    return value === filter;
+};
+
+const readPatientPage = (response) => {
+    const apiData = response?.data?.data || response?.data || {};
+    const results = Array.isArray(apiData?.results)
+        ? apiData.results
+        : Array.isArray(apiData)
+            ? apiData
+            : [];
+    const parsedCount = Number(apiData?.count);
+    const hasCount = Number.isFinite(parsedCount);
+    return {
+        results,
+        count: hasCount ? parsedCount : results.length,
+        hasCount,
+        next: apiData?.next ?? null,
+        previous: apiData?.previous ?? null,
+    };
+};
+
 const PatientManagement = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -51,9 +112,19 @@ const PatientManagement = () => {
         previous: null
     });
     const [isLoading, setIsLoading] = useState(false);
+    const [loadedQuery, setLoadedQuery] = useState({ page: 0, search: null });
     const [toast, setToast] = useState(null);
+    const [catalog, setCatalog] = useState([]);
+    const [catalogSearch, setCatalogSearch] = useState(null);
+    const catalogCache = useRef({ search: null, results: null });
 
     const itemsPerPage = 10;
+    const filtersActive = filterPrakriti !== 'all' || filterGender !== 'all';
+
+    const showToast = (message, type) => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+    };
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -63,42 +134,100 @@ const PatientManagement = () => {
         return () => clearTimeout(timer);
     }, [searchTerm]);
 
-    // Fetch patients from API
-    const fetchPatients = async () => {
-        setIsLoading(true);
-        try {
-            const response = await doctorService.getPatient(
-                'patient', currentPage, itemsPerPage, debouncedSearch, filterPrakriti, filterGender
-            );
-            const apiData = response?.data?.data || response?.data;
+    const fetchAllPatients = async (search) => {
+        const pageSize = 100;
+        let page = 1;
+        let collected = [];
 
-            setPatientsData({
-                results: apiData?.results || [],
-                count: apiData?.count || 0,
-                next: apiData?.next,
-                previous: apiData?.previous
-            });
-        } catch (error) {
-            console.error('Error fetching patients:', error);
-            showToast('Failed to load patients', 'error');
-            // Fallback to empty data
-            setPatientsData({
-                results: [],
-                count: 0,
-                next: null,
-                previous: null
-            });
-        } finally {
-            setIsLoading(false);
+        while (page <= 30) {
+            const response = await doctorService.getPatient('patient', page, pageSize, search);
+            const pageData = readPatientPage(response);
+            if (!pageData.results.length) break;
+
+            const existingIds = new Set(collected.map((patient) => patient.id).filter((id) => id != null));
+            const fresh = pageData.results.filter((patient) => patient?.id == null || !existingIds.has(patient.id));
+            if (!fresh.length) break;
+            collected = collected.concat(fresh);
+
+            const moreByCount = pageData.hasCount && collected.length < pageData.count;
+            if (!pageData.next && !moreByCount) break;
+            page += 1;
         }
+
+        return collected;
     };
 
+    // Prakriti and gender are applied here. The list API accepts those
+    // query params but does not filter the returned patients.
     useEffect(() => {
-        fetchPatients();
+        let cancelled = false;
+
+        const loadPatients = async () => {
+            if (
+                filtersActive &&
+                catalogCache.current.search === debouncedSearch &&
+                Array.isArray(catalogCache.current.results)
+            ) {
+                setCatalog(catalogCache.current.results);
+                setCatalogSearch(debouncedSearch);
+                setIsLoading(false);
+                return;
+            }
+
+            setIsLoading(true);
+            try {
+                if (filtersActive) {
+                    const collected = await fetchAllPatients(debouncedSearch);
+                    if (cancelled) return;
+                    catalogCache.current = { search: debouncedSearch, results: collected };
+                    setCatalog(collected);
+                    setCatalogSearch(debouncedSearch);
+                } else {
+                    const response = await doctorService.getPatient(
+                        'patient', currentPage, itemsPerPage, debouncedSearch
+                    );
+                    if (cancelled) return;
+                    const pageData = readPatientPage(response);
+                    setPatientsData({
+                        results: pageData.results,
+                        count: pageData.count,
+                        next: pageData.next,
+                        previous: pageData.previous
+                    });
+                    setLoadedQuery({ page: currentPage, search: debouncedSearch });
+                }
+            } catch (error) {
+                if (cancelled) return;
+                console.error('Error fetching patients:', error);
+                showToast('Failed to load patients', 'error');
+                if (filtersActive) {
+                    setCatalog([]);
+                    setCatalogSearch(debouncedSearch);
+                } else {
+                    setPatientsData({
+                        results: [],
+                        count: 0,
+                        next: null,
+                        previous: null
+                    });
+                    setLoadedQuery({ page: currentPage, search: debouncedSearch });
+                }
+            } finally {
+                if (!cancelled) setIsLoading(false);
+            }
+        };
+
+        loadPatients();
+        return () => {
+            cancelled = true;
+        };
     }, [currentPage, debouncedSearch, filterPrakriti, filterGender]);
 
-    const sortedResults = useMemo(() => {
-        const results = [...patientsData.results];
+    const visiblePool = useMemo(() => {
+        const source = filtersActive ? catalog : patientsData.results;
+        const results = source.filter((patient) =>
+            matchesPrakriti(patient, filterPrakriti) && matchesGender(patient, filterGender)
+        );
         if (sortBy === 'name') {
             results.sort((a, b) => (a.patient_name || '').localeCompare(b.patient_name || ''));
         } else if (sortBy === 'lastAppointment') {
@@ -107,42 +236,49 @@ const PatientManagement = () => {
             results.sort((a, b) => (b.total_appointments || 0) - (a.total_appointments || 0));
         }
         return results;
-    }, [patientsData.results, sortBy]);
+    }, [filtersActive, catalog, patientsData.results, filterPrakriti, filterGender, sortBy]);
 
-    // Statistics calculations from API data
+    const tableRows = useMemo(() => {
+        if (!filtersActive) return visiblePool;
+        const start = (currentPage - 1) * itemsPerPage;
+        return visiblePool.slice(start, start + itemsPerPage);
+    }, [filtersActive, visiblePool, currentPage]);
+
+    // Statistics calculations from the patients currently in view
     const stats = {
-        total: patientsData.results.length,
-        active: patientsData.results.filter(p => p.total_appointments > 0).length,
-        newThisMonth: patientsData.results.filter(p => {
+        total: visiblePool.length,
+        active: visiblePool.filter(p => p.total_appointments > 0).length,
+        newThisMonth: visiblePool.filter(p => {
             const lastMonth = new Date();
             lastMonth.setMonth(lastMonth.getMonth() - 1);
             return p.last_appointment_date && new Date(p.last_appointment_date) > lastMonth;
         }).length,
         avgHealthScore: 78, // Default value until API provides health score
         prakritiDistribution: {
-            Vata: patientsData.results.filter(p => p.prakriti_result === 'Vata').length,
-            Pitta: patientsData.results.filter(p => p.prakriti_result === 'Pitta').length,
-            Kapha: patientsData.results.filter(p => p.prakriti_result === 'Kapha').length,
-            'Vata-Pitta': patientsData.results.filter(p => p.prakriti_result === 'Vata-Pitta').length,
-            'Pitta-Kapha': patientsData.results.filter(p => p.prakriti_result === 'Pitta-Kapha').length,
-            'Vata-Kapha': patientsData.results.filter(p => p.prakriti_result === 'Vata-Kapha').length
+            Vata: visiblePool.filter(p => matchesPrakriti(p, 'Vata')).length,
+            Pitta: visiblePool.filter(p => matchesPrakriti(p, 'Pitta')).length,
+            Kapha: visiblePool.filter(p => matchesPrakriti(p, 'Kapha')).length,
+            'Vata-Pitta': visiblePool.filter(p => matchesPrakriti(p, 'Vata-Pitta')).length,
+            'Pitta-Kapha': visiblePool.filter(p => matchesPrakriti(p, 'Pitta-Kapha')).length,
+            'Vata-Kapha': visiblePool.filter(p => matchesPrakriti(p, 'Vata-Kapha')).length
         },
-        totalRevenue: patientsData.results.reduce((sum, p) => sum + (p.total_appointments * 1500), 0)
+        totalRevenue: visiblePool.reduce((sum, p) => sum + ((p.total_appointments || 0) * 1500), 0)
     };
 
     // Get prakriti icon and color
     const getPrakritiInfo = (prakriti) => {
-        if (!prakriti) return { icon: Activity, color: 'bg-gray-100 text-gray-700', bg: '#f3f4f6', label: 'Not Assessed' };
+        const text = stringifyPrakriti(prakriti);
+        if (!text) return { icon: Activity, color: 'bg-gray-100 text-gray-700', bg: '#f3f4f6', label: 'Not Assessed' };
 
         const info = {
-            Vata: { icon: Wind, color: 'bg-purple-100 text-purple-700', bg: '#f3e8ff', label: 'Vata' },
-            Pitta: { icon: Sun, color: 'bg-orange-100 text-orange-700', bg: '#ffedd5', label: 'Pitta' },
-            Kapha: { icon: Moon, color: 'bg-blue-100 text-blue-700', bg: '#dbeafe', label: 'Kapha' },
-            'Vata-Pitta': { icon: Sparkles, color: 'bg-indigo-100 text-indigo-700', bg: '#e0e7ff', label: 'Vata-Pitta' },
-            'Pitta-Kapha': { icon: Droplet, color: 'bg-teal-100 text-teal-700', bg: '#ccfbf1', label: 'Pitta-Kapha' },
-            'Vata-Kapha': { icon: Leaf, color: 'bg-emerald-100 text-emerald-700', bg: '#d1fae5', label: 'Vata-Kapha' }
+            vata: { icon: Wind, color: 'bg-purple-100 text-purple-700', bg: '#f3e8ff', label: 'Vata' },
+            pitta: { icon: Sun, color: 'bg-orange-100 text-orange-700', bg: '#ffedd5', label: 'Pitta' },
+            kapha: { icon: Moon, color: 'bg-blue-100 text-blue-700', bg: '#dbeafe', label: 'Kapha' },
+            'pitta-vata': { icon: Sparkles, color: 'bg-indigo-100 text-indigo-700', bg: '#e0e7ff', label: 'Vata-Pitta' },
+            'kapha-pitta': { icon: Droplet, color: 'bg-teal-100 text-teal-700', bg: '#ccfbf1', label: 'Pitta-Kapha' },
+            'kapha-vata': { icon: Leaf, color: 'bg-emerald-100 text-emerald-700', bg: '#d1fae5', label: 'Vata-Kapha' }
         };
-        return info[prakriti] || { icon: Activity, color: 'bg-gray-100 text-gray-700', bg: '#f3f4f6', label: prakriti };
+        return info[prakritiKey(text)] || { icon: Activity, color: 'bg-gray-100 text-gray-700', bg: '#f3f4f6', label: text };
     };
 
     // Get unique prakriti values for filter
@@ -175,12 +311,6 @@ const PatientManagement = () => {
     //     showToast('Patients exported successfully', 'success');
     // };
 
-    // Show toast notification
-    const showToast = (message, type) => {
-        setToast({ message, type });
-        setTimeout(() => setToast(null), 3000);
-    };
-
     // Calculate age from DOB
     const calculateAge = (dob) => {
         if (!dob) return 'N/A';
@@ -204,7 +334,12 @@ const PatientManagement = () => {
         });
     };
 
-    const totalPages = Math.ceil(patientsData.count / itemsPerPage);
+    const totalCount = filtersActive ? visiblePool.length : patientsData.count;
+    const totalPages = Math.ceil(totalCount / itemsPerPage) || 0;
+    const unfilteredStale = !filtersActive && (
+        loadedQuery.page !== currentPage || loadedQuery.search !== debouncedSearch
+    );
+    const listLoading = isLoading || unfilteredStale || (filtersActive && catalogSearch !== debouncedSearch);
 
     return (
         <>
@@ -272,7 +407,7 @@ const PatientManagement = () => {
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="text-gray-500 text-sm">Total Appointments</p>
-                                    <p className="text-2xl font-bold text-gray-800">{patientsData.results.reduce((sum, p) => sum + p.total_appointments, 0)}</p>
+                                    <p className="text-2xl font-bold text-gray-800">{visiblePool.reduce((sum, p) => sum + (p.total_appointments || 0), 0)}</p>
                                     <p className="text-xs text-gray-500 mt-2">across all patients</p>
                                 </div>
                                 <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -390,11 +525,11 @@ const PatientManagement = () => {
 
                     {/* Patients List View */}
                     <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-                        {isLoading ? (
+                        {listLoading ? (
                             <div className="flex items-center justify-center py-20">
                                 <Loader2 className="w-8 h-8 animate-spin" style={{ color: '#0D614E' }} />
                             </div>
-                        ) : patientsData.results.length === 0 ? (
+                        ) : tableRows.length === 0 ? (
                             <div className="text-center py-20">
                                 <Users className="w-16 h-16 mx-auto text-gray-300 mb-4" />
                                 <p className="text-gray-500 text-lg">No patients found</p>
@@ -414,7 +549,7 @@ const PatientManagement = () => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
-                                            {sortedResults.map((patient) => {
+                                            {tableRows.map((patient) => {
                                                 const prakritiInfo = getPrakritiInfo(patient.prakriti_result);
                                                 const PrakritiIcon = prakritiInfo.icon;
                                                 const age = calculateAge(patient.dob);
@@ -503,7 +638,7 @@ const PatientManagement = () => {
                                 {totalPages > 1 && (
                                     <div className="px-3 sm:px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-gray-50">
                                         <div className="text-sm text-gray-500">
-                                            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, patientsData.count)} of {patientsData.count} patients
+                                            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, totalCount)} of {totalCount} patients
                                         </div>
                                         <div className="flex space-x-2">
                                             <button

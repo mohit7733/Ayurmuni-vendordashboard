@@ -308,19 +308,43 @@ export function normalizeBrand(brand) {
     };
 }
 
+export function getServiceCategory(item) {
+    const category = item?.service_category;
+    const name = (
+        item?.service_category_name ||
+        (category && typeof category === "object" ? category.name : "") ||
+        ""
+    ).trim();
+    if (!name) return null;
+    const id =
+        item?.service_category_id ??
+        item?.service_categoryId ??
+        (category && typeof category === "object"
+            ? category.id ?? category.pk
+            : category) ??
+        item?.id;
+    return {
+        id: id == null || id === "" ? "" : String(id),
+        name,
+    };
+}
+
 export function getServiceCategoryName(item) {
-    return (item?.service_category_name || "").trim();
+    return getServiceCategory(item)?.name || "";
 }
 
 export function uniqueServiceCategories(items = []) {
     return Array.from(
         new Map(
             items
-                .map(getServiceCategoryName)
+                .map(getServiceCategory)
                 .filter(Boolean)
-                .map((name) => [name.toLowerCase(), name])
+                .map((category) => [
+                    category.id || category.name.toLowerCase(),
+                    category,
+                ])
         ).values()
-    ).sort((a, b) => a.localeCompare(b));
+    ).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** Match product to brand filter (API uses brand_name_id / brand_id). */
@@ -330,9 +354,27 @@ export function productMatchesBrand(product, brandId) {
     return id === String(brandId);
 }
 
-export function productMatchesServiceCategory(product, serviceCategoryName) {
-    if (!serviceCategoryName) return true;
-    return getServiceCategoryName(product).toLowerCase() === serviceCategoryName.toLowerCase();
+export function productMatchesServiceCategory(product, serviceCategory) {
+    if (!serviceCategory) return true;
+    const selected =
+        typeof serviceCategory === "object"
+            ? serviceCategory
+            : { id: serviceCategory, name: serviceCategory };
+    // Products expose service_category_id / service_category_name; do not
+    // fall back to product.id here (that is the product's own id).
+    const category = product?.service_category;
+    const dedicatedId =
+        product?.service_category_id ??
+        product?.service_categoryId ??
+        (category && typeof category === "object"
+            ? category.id ?? category.pk
+            : category);
+    if (selected.id && dedicatedId != null && dedicatedId !== "") {
+        return String(dedicatedId) === String(selected.id);
+    }
+    const selectedName = String(selected.name || "").trim();
+    if (!selectedName) return true;
+    return getServiceCategoryName(product).toLowerCase() === selectedName.toLowerCase();
 }
 
 /** Load the full vendor catalog so variant approval_status is complete (not just first page). */

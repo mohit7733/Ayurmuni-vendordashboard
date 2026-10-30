@@ -2089,7 +2089,7 @@ const DoctorProfile = () => {
                                 }
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mt-6 pt-6 border-t border-gray-100">
+                            {/* <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mt-6 pt-6 border-t border-gray-100">
                                 <StatCard value={doctorData.stats.totalPatients} label="Total Patients" />
                                 <StatCard value={doctorData.stats.totalConsultations} label="Consultations" />
                                 <StatCard value={doctorData.stats.averageRating} label={`(${doctorData.stats.totalReviews} reviews)`} showStar />
@@ -2097,7 +2097,7 @@ const DoctorProfile = () => {
                                 <StatCard value={doctorData.stats.responseTime} label="Response (min)" />
                                 <StatCard value={`₹${doctorData.stats.thisMonthEarnings?.toLocaleString()}`} label="This Month" />
                                 <StatCard value={doctorData.stats.upcomingAppointments} label="Upcoming" />
-                            </div>
+                            </div> */}
                         </div>
                     </div>
 
@@ -2218,7 +2218,7 @@ const DoctorProfile = () => {
                                             );
                                         })}
                                     </div>
-                                    <div className="mt-6 p-4 bg-amber-50/50 rounded-xl border border-amber-100">
+                                    {/* <div className="mt-6 p-4 bg-amber-50/50 rounded-xl border border-amber-100">
                                         <div className="flex items-start gap-3">
                                             <AlertCircle size={18} className="text-amber-600 mt-0.5" />
                                             <div>
@@ -2226,7 +2226,7 @@ const DoctorProfile = () => {
                                                 <p className="text-xs text-amber-700">Documents are typically verified within 24-48 hours. Please ensure all uploaded documents are clear and legible.</p>
                                             </div>
                                         </div>
-                                    </div>
+                                    </div> */}
                                 </div>
                             )}
 

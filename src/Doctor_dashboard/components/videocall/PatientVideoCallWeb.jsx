@@ -630,7 +630,7 @@ export default function PatientVideoCallWeb({ doctorName = "Doctor", onCallEnd }
                     <button
                       type="button"
                       onClick={joinCall}
-                      className="px-8 py-3.5 bg-[#0D614E] text-white rounded-2xl font-semibold hover:bg-[#0a4d3e] active:scale-[0.98] transition-all flex items-center gap-2 shadow-lg shadow-emerald-900/40"
+                      className="px-8 py-3.5 bg-[#0D614E] text-white rounded-2xl font-semibold hover:bg-[#0a4d3e] hover:text-white active:scale-[0.98] transition-all flex items-center gap-2 shadow-lg shadow-emerald-900/40"
                     >
                       <Phone size={18} /> {joinLabel}
                     </button>

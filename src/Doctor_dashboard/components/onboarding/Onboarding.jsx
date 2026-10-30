@@ -264,7 +264,7 @@ const FormSelect = ({ label, name, value, onChange, error, required, options, pl
             className={`w-full px-4 py-2.5 border rounded-xl capitalize focus:outline-none focus:ring-2 transition-all ${error ? 'border-rose-500 focus:ring-rose-500 bg-rose-50' : 'border-gray-200 focus:ring-[#0D614E]'
                 }`}
         >
-            <option value="">{placeholder || `Select ${label}`}</option>
+            <option value="" disabled>{placeholder || `Select ${label}`}</option>
 
             {
                 (name === "primaryDosha" || name === "primarydisease")
@@ -378,7 +378,9 @@ const ChipInput = ({ label, items, onAdd, onRemove, options, error, placeholder 
                     className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${error ? 'border-rose-500 focus:ring-rose-500 bg-rose-50' : 'border-gray-200 focus:ring-[#0D614E]'
                         }`}
                 >
-                    <option value="">{placeholder}</option>
+                    <option value="" disabled>
+                        {placeholder}
+                    </option>
                     {options?.filter(opt => !items.includes(opt.id)).map(opt => (
                         <option key={opt} value={opt.id}>{opt.name}</option>
                     ))}
@@ -388,7 +390,9 @@ const ChipInput = ({ label, items, onAdd, onRemove, options, error, placeholder 
                     className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${error ? 'border-rose-500 focus:ring-rose-500 bg-rose-50' : 'border-gray-200 focus:ring-[#0D614E]'
                         }`}
                 >
-                    <option value="">{placeholder}</option>
+                    <option value="" disabled>
+                        {placeholder}
+                    </option>
                     {options?.filter(opt => !items.includes(opt)).map(opt => (
                         <option key={opt} value={opt}>{opt}</option>
                     ))}

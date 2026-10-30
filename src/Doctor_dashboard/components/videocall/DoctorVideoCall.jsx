@@ -693,7 +693,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
           )}
 
           {callState !== "active" && callState !== "joining" && (
-            <div className="absolute inset-0 flex flex-col items-center top-10 bg-black/80 z-10">
+            <div className="absolute inset-0 flex flex-col items-center top-40 bg-black/80 z-10">
               {callState === "idle" ? (
                 <>
                   <Video size={48} className="text-gray-600 mb-3" />
@@ -701,7 +701,7 @@ export default function DoctorVideoCall({ consultationId: consultationIdProp, pa
                   {permissions.camera && permissions.microphone ? (
                     <a
                       onClick={joinCall}
-                      className="video-call-no-drag px-6 py-2.5 bg-[#0a4d3e] text-white rounded-xl text-sm font-semibold hover:bg-[#0d614e] transition-all flex items-center gap-2 shadow-lg"
+                      className="video-call-no-drag px-6 py-2.5 bg-[#0a4d3e] text-white rounded-xl text-sm font-semibold hover:bg-[#0d614e] hover:text-white transition-all flex items-center gap-2 shadow-lg"
                     >
                       <Phone size={16} /> {joinLabel}
                     </a>

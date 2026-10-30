@@ -1508,6 +1508,10 @@ const AppointmentDetail = ({ videodetails }) => {
             toast.error("Chief Complaint is required");
             return false;
         }
+        if (formData.follow_up.schedule && (!formData.follow_up.date || !formData.follow_up.reason)) {
+            toast.error("Follow-up details are required");
+            return false;
+        }
         // if (!formData.prescriptions[0]) {
         //     toast.error("Prescribed Medicines is required");
         //     return false;
@@ -1963,9 +1967,9 @@ const AppointmentDetail = ({ videodetails }) => {
                                         <MessageCircle className="w-3.5 h-3.5" /> Message
                                     </Link>
 
-                                    {/* {console.log(appointment?.start_time, appointment?.end_time)} */}
+                                    {/* {console.log(isCallTime)} */}
 
-                                    {appointment?.status === "confirmed" && isCallTime && (
+                                    {(appointment?.status === "confirmed" || appointment?.status === "rescheduled") && (
                                         <button
                                             onClick={() => {
                                                 videodetails({
@@ -2085,7 +2089,7 @@ const AppointmentDetail = ({ videodetails }) => {
 
                                 {/* Prescription Tab */}
                                 {activeTab === 'prescription' && (
-                                    appointment?.status == "confirmed" || editingPrescriptionId
+                                    appointment?.status == "confirmed" || appointment?.status === "rescheduled" || editingPrescriptionId
                                         // || appointment?.status == "completed"
                                         ?
                                         <div className="space-y-6">
