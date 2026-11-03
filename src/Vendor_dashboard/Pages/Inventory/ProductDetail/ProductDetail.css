@@ -449,7 +449,7 @@
 .pd-variant-prices {
   display: flex;
   gap: 1.25rem;
-  align-items: flex-end;
+  /* align-items: flex-end; */
 }
 
 .pd-variant-grid {

@@ -163,8 +163,7 @@ export default function EditProduct() {
                     is_active: product.is_active !== undefined ? product.is_active : true,
                 });
 
-                setHealthConcerns(product.health_disease_ids || []);
-
+                setHealthConcerns(product.health_diseases?.map(disease => disease.id) || []);
                 const processedVariants = product.variants.map(variant => ({
                     ...variant,
                     galleryImages: variant.media?.map(media => ({
@@ -1228,6 +1227,7 @@ export default function EditProduct() {
                                 <div className="health-tags !block">
                                     <div className="md:col-span-2">
                                         <div className="flex flex-wrap gap-2 mb-2">
+                                            {console.log(healthConcerns, "healthConcerns")}
                                             {healthConcerns?.map((item, idx) => {
                                                 const selectedOption = lists?.diseasescate?.find(opt => opt.id === item);
                                                 return (

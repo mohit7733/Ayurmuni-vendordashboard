@@ -35,7 +35,8 @@ import {
     ChevronRight,
     Filter,
     ChevronDown as ChevronDownIcon,
-    ArrowUpDown
+    ArrowUpDown,
+    Info
 } from 'lucide-react';
 import { doctorService } from '../../../services/doctorService';
 import toast from 'react-hot-toast';
@@ -43,7 +44,7 @@ import { Link } from 'react-router-dom';
 
 // ==================== CONSTANTS ====================
 const STATUS_CONFIG = {
-    completed: { color: 'bg-emerald-100 text-emerald-700', icon: CheckCircle, label: 'Completed', bg: 'emerald' },
+    completed: { color: 'bg-emerald-100 text-emerald-700', icon: CheckCheck, label: 'Completed', bg: 'emerald' },
     missed: { color: 'bg-gray-100 text-gray-700', icon: ClockIcon, label: 'Missed', bg: 'gray' },
     confirmed: { color: 'bg-blue-100 text-blue-700', icon: CheckCheck, label: 'Confirmed', bg: 'blue' },
     cancelled: { color: 'bg-rose-100 text-rose-700', icon: XCircle, label: 'Cancelled', bg: 'rose' },
@@ -511,6 +512,7 @@ const AppointmentsPage = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isActionLoading, setIsActionLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
     const [searchbydate, setsearchbydate] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [typeFilter, setTypeFilter] = useState('all');
@@ -536,6 +538,15 @@ const AppointmentsPage = () => {
     });
     const [totalItems, setTotalItems] = useState(0);
 
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+            setCurrentPage(1);
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, [searchTerm]);
+
     // Fetch appointments from API
     const fetchAppointments = useCallback(async () => {
         setIsLoading(true);
@@ -545,7 +556,7 @@ const AppointmentsPage = () => {
                 currentPage,
                 itemsPerPage,
                 {
-                    search: searchTerm,
+                    search: debouncedSearchTerm,
                     status: statusFilter,
                     appointment_date: searchbydate,
                 }
@@ -602,7 +613,7 @@ const AppointmentsPage = () => {
         // } catch (error) {
         //     toast.error('Failed to load appointments');
         // }
-    }, [currentPage, searchTerm, itemsPerPage, searchbydate, statusFilter]);
+    }, [currentPage, debouncedSearchTerm, itemsPerPage, searchbydate, statusFilter]);
 
     useEffect(() => {
         fetchAppointments();
@@ -841,11 +852,8 @@ const AppointmentsPage = () => {
                                 <input
                                     type="text"
                                     placeholder="Search by patient name, concern, or notes..."
-                                    defaultValue={searchTerm}
-                                    onBlur={(e) => {
-                                        setSearchTerm(e.target.value);
-                                        setCurrentPage(1);
-                                    }}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
                                     className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0D614E]"
                                 />
                             </div>
@@ -1053,21 +1061,82 @@ const AppointmentsPage = () => {
                                                     } */}
 
                                                     <td className="px-6 py-4">
-                                                        <StatusBadge status={appointment.status} />
+                                                        {appointment.status === "missed" ? (
+                                                            <div className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
+                                                                {appointment?.missed_by === "doctor" ? "Missed by Doctor" : "Missed by Patient"}
+                                                            </div>
+                                                        ) :
+                                                            <StatusBadge status={appointment.status} />
+                                                        }
+
 
                                                         {appointment.status === "cancelled" && (
-                                                            <div className="ml-2 inline-flex flex-col gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
-                                                                {appointment?.cancelled_by && (
-                                                                    <span className="text-xs text-gray-600">
-                                                                        By: {appointment?.cancelled_by}
-                                                                    </span>
-                                                                )}
+                                                            <div className="relative group inline-block ml-2">
+                                                                <button
+                                                                    type="button"
+                                                                    className="inline-flex items-center justify-center w-6 h-6 rounded-full
+                text-red-500 bg-red-50 hover:bg-red-100
+                border border-red-200 transition-all"
+                                                                >
+                                                                    <Info size={12} />
+                                                                </button>
 
-                                                                {appointment?.cancellation_reason && (
-                                                                    <span className="text-xs text-gray-600">
-                                                                        Reason: {appointment?.cancellation_reason}
-                                                                    </span>
-                                                                )}
+                                                                {/* Cancellation Details Tooltip */}
+                                                                <div className="absolute right-0 top-full mt-2 z-50 w-72
+                invisible opacity-0 group-hover:visible group-hover:opacity-100
+                transition-all duration-200">
+
+                                                                    <div className="bg-white border border-gray-200 rounded-xl
+                    shadow-xl p-4">
+
+                                                                        <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
+                                                                            <div className="w-8 h-8 rounded-full bg-red-50
+                            flex items-center justify-center">
+                                                                                <Info size={16} className="text-red-500" />
+                                                                            </div>
+
+                                                                            <div>
+                                                                                <p className="text-sm font-semibold text-gray-800">
+                                                                                    Cancellation Details
+                                                                                </p>
+                                                                                <p className="text-xs text-gray-400">
+                                                                                    Appointment cancelled
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="mt-3 space-y-3">
+                                                                            {appointment?.cancelled_by && (
+                                                                                <div>
+                                                                                    <p className="text-xs text-gray-400 mb-1">
+                                                                                        Cancelled By
+                                                                                    </p>
+                                                                                    <p className="text-sm font-medium text-gray-700 capitalize">
+                                                                                        {appointment.cancelled_by}
+                                                                                    </p>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {appointment?.cancellation_reason && (
+                                                                                <div>
+                                                                                    <p className="text-xs text-gray-400 mb-1">
+                                                                                        Cancellation Reason
+                                                                                    </p>
+                                                                                    <p className="text-sm text-gray-700 leading-relaxed break-words">
+                                                                                        {appointment.cancellation_reason}
+                                                                                    </p>
+                                                                                </div>
+                                                                            )}
+
+                                                                            {!appointment?.cancelled_by &&
+                                                                                !appointment?.cancellation_reason && (
+                                                                                    <p className="text-xs text-gray-500">
+                                                                                        No cancellation details available.
+                                                                                    </p>
+                                                                                )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         )}
 
@@ -1078,7 +1147,7 @@ const AppointmentsPage = () => {
                                                             </span>
                                                         )}
 
-                                                        
+
 
 
                                                         {appointment.status === "confirmed" && getCallStatus(appointment) === "upcoming" && (

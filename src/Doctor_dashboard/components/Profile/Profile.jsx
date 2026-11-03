@@ -1870,7 +1870,11 @@ const DoctorProfile = () => {
                 ...prev,
                 documents: { ...prev.documents, [selectedDocument]: response.url }
             }));
-            toast.success(`${selectedDocument.replace(/_/g, ' ')} uploaded successfully!`);
+            toast.success(
+                `${selectedDocument
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, char => char.toUpperCase())} uploaded successfully!`
+            );
             setShowDocumentModal(false);
             setSelectedDocument(null);
             setSelectedFile(null);

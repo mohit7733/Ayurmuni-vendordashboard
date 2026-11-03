@@ -374,7 +374,7 @@ const ProductDetail = () => {
               <div className="pd-stat">
                 <span className="pd-stat-label">Approval</span>
                 <span className="pd-stat-value text-sm">
-                  {approvalSummary.approved} approved · {approvalSummary.pending} pending
+                  {approvalSummary.approved} Approved · {approvalSummary.pending} Pending
                 </span>
               </div>
               <div className="pd-stat">

@@ -42,6 +42,26 @@ const getInitials = (name) => {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
 };
 
+/** Local thread for a patient who has no prior conversation history. */
+const buildNewPatientConversation = (rawPatientId) => {
+    const normalizedId = normalizePatientId(rawPatientId);
+    return {
+        id: normalizedId,
+        patientId: normalizedId,
+        doctorId: null,
+        appointmentId: null,
+        name: 'Patient',
+        avatar: null,
+        lastMessage: '',
+        lastMessageTime: null,
+        unreadCount: 0,
+        online: false,
+        phone: '',
+        email: '',
+        chatAccess: null,
+    };
+};
+
 const formatTime = (date) => {
     if (!date) return '';
     const value = date instanceof Date ? date : new Date(date);
@@ -418,6 +438,32 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
         }
     }, []);
 
+    const applyParticipantDetails = useCallback((targetPatientId, conversation) => {
+        const participant = conversation?.participant || conversation?.patient || {};
+        const resolvedName = (
+            participant.name
+            || [participant.first_name, participant.last_name].filter(Boolean).join(' ')
+        ).trim();
+        const avatar = participant.profile_picture || participant.avatar || null;
+        if (!resolvedName && !avatar && !participant.phone_number && !participant.email) return;
+
+        const patch = (patient) => {
+            if (!patient || normalizePatientId(patient.patientId) !== normalizePatientId(targetPatientId)) {
+                return patient;
+            }
+            return {
+                ...patient,
+                ...(resolvedName ? { name: resolvedName } : {}),
+                ...(avatar ? { avatar } : {}),
+                ...(participant.phone_number ? { phone: participant.phone_number } : {}),
+                ...(participant.email ? { email: participant.email } : {}),
+            };
+        };
+
+        setPatients((prev) => prev.map(patch));
+        setSelectedPatient((prev) => patch(prev));
+    }, []);
+
     const loadConversationHistory = useCallback(async (
         patientId,
         { markRead = true, broadcast = true } = {}
@@ -433,6 +479,7 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
                 mapBackendMessageToUi(msg, patientId)
             );
             syncMessagesForPatient(patientId, uiMessages, { broadcast });
+            applyParticipantDetails(patientId, data.conversation);
 
             const access = data.conversation?.chat_access || null;
             if (access) {
@@ -451,16 +498,22 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
 
             return data;
         } catch (error) {
+            const status = error?.response?.status;
             if (requestId === historyRequestRef.current && isActivePatient(patientId)) {
-                toast.error(apiErrorMessage(error, 'Failed to load conversation'));
+                // No thread on the server yet — keep the new conversation open and empty.
+                if (status === 404) {
+                    syncMessagesForPatient(patientId, [], { broadcast: false });
+                } else {
+                    toast.error(apiErrorMessage(error, 'Failed to load conversation'));
+                }
             }
-            throw error;
+            if (status !== 404) throw error;
         } finally {
             if (requestId === historyRequestRef.current && isActivePatient(patientId)) {
                 setIsLoadingMessages(false);
             }
         }
-    }, [syncMessagesForPatient, isActivePatient, applyConversationAccess]);
+    }, [syncMessagesForPatient, isActivePatient, applyConversationAccess, applyParticipantDetails]);
 
     const handleChatEvent = useCallback((event, appointmentId, patientId, sessionId) => {
         if (wsSessionRef.current !== sessionId) return;
@@ -619,24 +672,39 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
             const data = await fetchConversationList({ search });
             const conversations = mapConversationListItems(data.conversations);
             const activePatientId = normalizePatientId(selectedPatientRef.current?.patientId);
-            setPatients(
-                activePatientId
+            const routePatientId = normalizePatientId(patientId);
+            setPatients((prev) => {
+                let next = activePatientId
                     ? conversations.map((conversation) => (
                         normalizePatientId(conversation.patientId) === activePatientId
                             ? { ...conversation, unreadCount: 0 }
                             : conversation
                     ))
-                    : conversations
-            );
+                    : conversations;
+
+                if (routePatientId && !String(search || '').trim()) {
+                    const inList = next.some(
+                        (conversation) => normalizePatientId(conversation.patientId) === routePatientId
+                    );
+                    if (!inList) {
+                        const kept = prev.find(
+                            (item) => normalizePatientId(item.patientId) === routePatientId
+                        );
+                        next = [kept || buildNewPatientConversation(routePatientId), ...next];
+                    }
+                }
+                return next;
+            });
         } catch (error) {
             if (!silent) {
                 toast.error(apiErrorMessage(error, 'Failed to load conversations'));
-                setPatients([]);
+                const routePatientId = normalizePatientId(patientId);
+                setPatients(routePatientId ? [buildNewPatientConversation(routePatientId)] : []);
             }
         } finally {
             if (!silent) setIsLoadingConversations(false);
         }
-    }, []);
+    }, [patientId]);
 
     fetchConversationsRef.current = fetchConversations;
 
@@ -887,14 +955,33 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
     };
 
     useEffect(() => {
-        if (!patientId || patients.length === 0) return;
+        if (!patientId || isLoadingConversations) return;
+
+        const normalizedId = normalizePatientId(patientId);
         const match = patients.find(
-            (p) => normalizePatientId(p.patientId) === normalizePatientId(patientId)
+            (p) => normalizePatientId(p.patientId) === normalizedId
         );
+
         if (match) {
-            handlePatientSelect(match);
+            if (normalizePatientId(selectedPatientRef.current?.patientId) !== normalizedId) {
+                handlePatientSelect(match);
+            }
+            return;
         }
-    }, [patientId, patients]);
+
+        if (searchQuery.trim()) return;
+
+        const created = buildNewPatientConversation(normalizedId);
+        setPatients((prev) => {
+            if (prev.some((p) => normalizePatientId(p.patientId) === normalizedId)) {
+                return prev;
+            }
+            return [created, ...prev];
+        });
+        if (normalizePatientId(selectedPatientRef.current?.patientId) !== normalizedId) {
+            handlePatientSelect(created);
+        }
+    }, [patientId, patients, isLoadingConversations, searchQuery]);
 
     const renderEmptyState = () => (
         <div className="flex-1 flex items-center justify-center bg-gray-50">
@@ -993,7 +1080,7 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
                             <Avatar src={selectedPatient.avatar} name={selectedPatient.name} className="w-10 h-10 shrink-0" />
                             <div className="min-w-0">
                                 <h3 className="font-medium text-gray-800 truncate">{selectedPatient.name}</h3>
-                                <p className="text-xs text-gray-400">
+                                <p className="text-xs text-gray-400 capitalize">
                                     {chatAccess?.active_phase
                                         ? `${chatAccess.active_phase.replace(/_/g, ' ')} chat`
                                         : chatAccess?.can_send

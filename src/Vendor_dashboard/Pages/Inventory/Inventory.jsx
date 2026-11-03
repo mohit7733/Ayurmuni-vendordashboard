@@ -281,10 +281,11 @@ function ProductBlock({ product, expanded, onToggle, onToggleStatus, onDelete })
                 <span className="iv-meta-value">{product.product_subcategory}</span>
               </>
             )}
-            {product.product_subcategory_name && (
+            {product.health_diseases && (
               <>
                 <span className="iv-meta-dot">•</span>
-                <span className="iv-meta-value">{product.product_subcategory_name}</span>
+                <span className="iv-meta-label">Health Diseases:</span>
+                <span className="iv-meta-value">{product.health_diseases?.length}</span>
               </>
             )}
           </div>
