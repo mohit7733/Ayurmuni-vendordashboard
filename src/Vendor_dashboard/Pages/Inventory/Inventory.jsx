@@ -239,15 +239,22 @@ function VariantRow({ product, variant, onToggleStatus }) {
 }
 
 function ProductBlock({ product, expanded, onToggle, onToggleStatus, onDelete }) {
+  const variants = Array.isArray(product.variants) ? product.variants : [];
   const firstVariantWithImage =
-    (product.variants || []).find((v) => getVariantCoverImageUrl(v)) || product.variants?.[0];
+    variants.find((variant) => getVariantCoverImageUrl(variant)) || variants[0];
   const avatarUrl = getVariantCoverImageUrl(firstVariantWithImage) || Ayurvedaimage;
   const isExpanded = expanded === product.id;
+  const approvalCounts = variants.reduce((counts, variant) => {
+    if (Object.prototype.hasOwnProperty.call(counts, variant.approval_status)) {
+      counts[variant.approval_status] += 1;
+    }
+    return counts;
+  }, { approved: 0, pending: 0, suspended: 0, rejected: 0 });
 
   return (
     <div className="iv-product-block ds-card ds-card-interactive ds-animate-in">
       <div className="iv-product-header">
-        <div className="iv-product-avatar shadow-md">
+        <div className="iv-product-avatar">
           <img
             src={avatarUrl}
             alt={product.name}
@@ -257,55 +264,67 @@ function ProductBlock({ product, expanded, onToggle, onToggleStatus, onDelete })
           />
         </div>
         <div className="iv-product-info">
-          <div className="iv-product-name">
-            {product.name}
-            {/* <span className={`iv-product-tag ${getTagClass(product)}`}>{getTagLabel(product)}</span> */}
-          </div>
-          <div className="iv-product-meta">
-            <span className="iv-meta-label">Brand:</span>
-            <span className="iv-meta-value">{product.brand_name || "—"}</span>
-            <span className="iv-meta-dot">•</span>
-            <span className="iv-meta-label">Variants:</span>
-            <span className="iv-meta-value">{product.variants?.length || 0}</span>
+          <h3 className="iv-product-name">{product.name}</h3>
+          <div className="iv-product-facts">
+            <div className="iv-fact">
+              <span className="iv-fact-label">Brand</span>
+              <p className="iv-fact-value">{product.brand_name || "—"}</p>
+            </div>
             {product.service_category_name && (
-              <>
-                <span className="iv-meta-dot">•</span>
-                <span className="iv-meta-label">Service:</span>
-                <span className="iv-meta-value">{product.service_category_name}</span>
-              </>
+              <div className="iv-fact">
+                <span className="iv-fact-label">Category</span>
+                <p className="iv-fact-value">{product.service_category_name}</p>
+              </div>
             )}
             {product.product_subcategory && (
-              <>
-                <span className="iv-meta-dot">•</span>
-                <span className="iv-meta-label">Product Subcategory:</span>
-                <span className="iv-meta-value">{product.product_subcategory}</span>
-              </>
+              <div className="iv-fact">
+                <span className="iv-fact-label">Subcategory</span>
+                <p className="iv-fact-value">{product.product_subcategory}</p>
+              </div>
             )}
-            {product.health_diseases && (
-              <>
-                <span className="iv-meta-dot">•</span>
-                <span className="iv-meta-label">Health Diseases:</span>
-                <span className="iv-meta-value">{product.health_diseases?.length}</span>
-              </>
+            {Array.isArray(product.health_diseases) && product.health_diseases.length > 0 && (
+              <div className="iv-fact">
+                <span className="iv-fact-label">Health concerns</span>
+                <p className="iv-fact-value">{product.health_diseases.length}</p>
+              </div>
+            )}
+            {variants && (
+              <div className="iv-fact">
+                <span className="iv-fact-label">{variants.length === 1 ? "variant" : "variants"}</span>
+                <p className="iv-fact-value">{variants.length} </p>
+              </div>
             )}
           </div>
+          <div className="iv-approval-summary" aria-label="Variant approval summary">
+            {Object.entries(approvalCounts).map(([status, count]) => count > 0 && (
+              <span key={status} className={`iv-approval-chip iv-approval-${status}`}>
+                {count} {status}
+              </span>
+            ))}
+          </div>
         </div>
-        <button type="button" className="iv-btn-view-all ds-focus active:scale-[0.98] transition-transform duration-200" onClick={() => onToggle(product.id)}>
-          {isExpanded ? "Hide Variants" : "View Variants"}
-        </button>
-        <div className="flex items-center gap-2">
+        <div className="iv-product-actions">
+          <button
+            type="button"
+            className="iv-action iv-action-primary ds-focus"
+            onClick={() => onToggle(product.id)}
+            aria-expanded={isExpanded}
+          >
+            {isExpanded ? "Hide variants" : "View variants"}
+          </button>
           <Link
             to={`/vendor/products/${product.id}`}
-            className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-600 transition hover:bg-gray-50"
+            className="iv-action"
           >
+            <FaEye aria-hidden="true" />
             View
           </Link>
           <Link
             to={`/vendor/edit-product/${product.id}`}
-            className="rounded-lg border border-green-200 p-2 !text-green-600 transition hover:bg-green-50"
-            aria-label="Edit product"
+            className="iv-action iv-action-edit"
           >
-            <FaEdit size={16} />
+            <FaEdit aria-hidden="true" />
+            Edit
           </Link>
           {/* <button
             type="button"

@@ -470,16 +470,34 @@ body {
 
 .iv-product-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 16px;
-  /* padding: 24px; */
   flex-wrap: wrap;
 }
 
+.iv-product-block .iv-product-header {
+  align-items: center;
+}
+
 @media (max-width: 640px) {
-  .iv-product-header {
-    flex-direction: column;
+  .iv-product-block .iv-product-header {
+    flex-direction: row;
     align-items: flex-start;
+  }
+
+  .iv-product-block .iv-product-info {
+    flex: 1 1 calc(100% - 66px);
+    min-width: 0;
+  }
+
+  .iv-product-block .iv-product-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .iv-action {
+    flex: 1;
+    justify-content: center;
   }
 }
 
@@ -519,9 +537,11 @@ body {
 
 .iv-product-info {
   flex: 1;
+  min-width: 220px;
 }
 
 .iv-product-name {
+  margin: 0;
   font-size: 16px;
   font-weight: 700;
   color: var(--text);
@@ -552,6 +572,131 @@ body {
 .iv-tag-nutrition {
   background: #d0eee6;
   color: var(--green);
+}
+
+.iv-product-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px 16px;
+  margin: 10px 0 0;
+}
+
+.iv-fact {
+  min-width: 0;
+}
+
+.iv-fact-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.iv-fact-value {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.iv-product-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.iv-approval-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.iv-approval-total,
+.iv-approval-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-transform: capitalize;
+}
+
+.iv-approval-total {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.iv-approval-approved {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.iv-approval-pending {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.iv-approval-suspended {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.iv-approval-rejected {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.iv-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #334155;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.iv-action:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.iv-action-primary {
+  border-color: #0D614E;
+  background: #0D614E;
+  color: #fff;
+}
+
+.iv-action-primary:hover {
+  background: #0a4d3e;
+  color: #fff;
+}
+
+.iv-action-edit {
+  color: #0D614E;
+  border-color: #b7e4c7;
+}
+
+.iv-action-edit:hover {
+  background: #e8f5f2;
+  color: #0D614E;
 }
 
 .iv-product-meta {
@@ -971,10 +1116,6 @@ body {
   .iv-variants-table {
     overflow-x: auto;
     display: block;
-  }
-
-  .iv-product-header {
-    padding: 20px;
   }
 
   .iv-variants-table th,
