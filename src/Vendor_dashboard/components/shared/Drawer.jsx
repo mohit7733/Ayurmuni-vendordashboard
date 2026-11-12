@@ -10,6 +10,7 @@ export default function Drawer({
   footer,
   side = "right",
   width = "24rem",
+  className = "",
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -31,7 +32,7 @@ export default function Drawer({
     <div className="ds-drawer-root" role="presentation">
       <button type="button" className="ds-drawer-backdrop" aria-label="Close" onClick={onClose} />
       <aside
-        className={`ds-drawer ds-drawer--${side}`}
+        className={`ds-drawer ds-drawer--${side} ${className}`.trim()}
         style={{ width }}
         role="dialog"
         aria-modal="true"

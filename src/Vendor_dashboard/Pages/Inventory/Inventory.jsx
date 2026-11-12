@@ -353,7 +353,12 @@ function ProductBlock({ product, expanded, onToggle, onToggleStatus, onDelete })
             </thead>
             <tbody>
               {(product.variants || []).map((variant) => (
-                <VariantRow key={variant.id} product={product} variant={variant} onToggleStatus={onToggleStatus} />
+                <VariantRow
+                  key={variant.id}
+                  product={product}
+                  variant={variant}
+                  onToggleStatus={onToggleStatus}
+                />
               ))}
             </tbody>
           </table>

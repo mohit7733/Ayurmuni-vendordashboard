@@ -38,12 +38,14 @@ import StatusBadge from "../../../components/shared/StatusBadge";
 import { PageEmpty, PageLoader } from "../../../components/shared/PageState";
 import "../../../components/shared/vendor-shared.css";
 import "../../../components/shared/design-system.css";
+import ProductVariantOrders from "../ProductVariantOrders";
 import "./ProductDetail.css";
 
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "clinical", label: "Clinical Info" },
   { id: "variants", label: "Variants" },
+  { id: "orders", label: "Orders" },
   { id: "inventory", label: "Inventory" },
   { id: "images", label: "Images" },
   { id: "approval", label: "Approval" },
@@ -648,6 +650,12 @@ const ProductDetail = () => {
                 );
               })
             )}
+          </div>
+        )}
+
+        {activeTab === "orders" && (
+          <div className="pd-tab-panel ds-stagger">
+            <ProductVariantOrders productId={id} variants={variants} />
           </div>
         )}
 

@@ -1,0 +1,231 @@
+.pvo-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.pvo-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: min(100%, 280px);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.pvo-filter select {
+  height: 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 0 12px;
+}
+
+.pvo-toolbar-note {
+  margin: 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.pvo-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pvo-stat {
+  background: #fff;
+  border: 1px solid #e8ece6;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.pvo-stat-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.pvo-stat strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 16px;
+  color: #0d614e;
+}
+
+.pvo-note {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #b45309;
+}
+
+.pvo-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pvo-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #334155;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pvo-tab span {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  font-size: 10px;
+}
+
+.pvo-tab--active {
+  background: #0d614e;
+  border-color: #0d614e;
+  color: #fff;
+}
+
+.pvo-tab--active span {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.pvo-tab--pending { border-color: #ddd6fe; }
+.pvo-tab--confirmed,
+.pvo-tab--delivered { border-color: #bbf7d0; }
+.pvo-tab--processing,
+.pvo-tab--shipped { border-color: #bfdbfe; }
+.pvo-tab--cancelled,
+.pvo-tab--returned { border-color: #fecaca; }
+
+.pvo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 900px) {
+  .pvo-list {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.pvo-card {
+  background: #fff;
+  border: 1px solid #e8ece6;
+  border-left-width: 4px;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.pvo-card--pending { border-left-color: #7c3aed; }
+.pvo-card--confirmed { border-left-color: #059669; }
+.pvo-card--processing { border-left-color: #2563eb; }
+.pvo-card--shipped { border-left-color: #0284c7; }
+.pvo-card--delivered { border-left-color: #047857; }
+.pvo-card--cancelled,
+.pvo-card--returned { border-left-color: #e11d48; }
+
+.pvo-card-top,
+.pvo-card-foot,
+.pvo-lines li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pvo-code {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.pvo-meta {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.pvo-lines {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pvo-lines li {
+  font-size: 13px;
+  color: #334155;
+}
+
+.pvo-lines li span:last-child {
+  color: #0d614e;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pvo-card-foot {
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.pvo-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+@media (max-width: 640px) {
+  .pvo-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .pvo-card-top,
+  .pvo-card-foot,
+  .pvo-lines li {
+    flex-direction: column;
+  }
+}
