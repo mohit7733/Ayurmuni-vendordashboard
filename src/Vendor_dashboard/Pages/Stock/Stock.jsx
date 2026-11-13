@@ -12,7 +12,7 @@ import {
     TrendingDown,
     Warehouse,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { vendorService } from "../../../services/vendorService";
 import usePersistedState from "../../hooks/usePersistedState";
 import DashboardPageShell from "../../components/shared/DashboardPageShell";
@@ -58,6 +58,7 @@ import {
 } from "./stockHelpers";
 import "../../components/shared/vendor-shared.css";
 import "./Stock.css";
+import { FaEye } from "react-icons/fa";
 
 const QTY_PRESETS = [10, 25, 50, 100];
 
@@ -228,15 +229,16 @@ function StockTableRow({ item, onEdit, onDelete, onBlocked }) {
             <TableCell>
                 <div className="stock-row-actions" onClick={(e) => e.stopPropagation()}>
                     {item?.status === "inactive" ? (
-                            <Button
-                                variant="ghost"
-                                className="!px-2.5 !py-1.5 !text-xs !text-gray-500 !border-gray-300 hover:!bg-gray-50"
-                                onClick={() => onBlocked(item)}
-                                aria-label="Product inactive"
-                            >
-                                <Lock size={14} />
-                                Inactive
-                            </Button>) : canEdit ? (
+                        <Button
+                            variant="ghost"
+                            className="!px-2.5 !py-1.5 !text-xs !text-gray-500 !border-gray-300 hover:!bg-gray-50"
+                            onClick={() => onBlocked(item)}
+                            aria-label="Product inactive"
+                        >
+                            <Lock size={14} />
+                            Inactive
+                        </Button>) : canEdit ? (
+                            <>
                                 <Button
                                     variant="ghost"
                                     className="!px-2.5 !py-1.5 !text-xs !text-[#0D614E] !border-[#0D614E]/20 hover:!bg-[#0D614E]/5"
@@ -246,17 +248,27 @@ function StockTableRow({ item, onEdit, onDelete, onBlocked }) {
                                     <Pencil size={14} />
                                     Update
                                 </Button>
-                            ) : (
-                            <Button
-                                variant="ghost"
-                                className="!px-2.5 !py-1.5 !text-xs !text-amber-700 !border-amber-200 hover:!bg-amber-50"
-                                onClick={() => onBlocked(item)}
-                                aria-label="Quantity update locked"
-                            >
-                                <Lock size={14} />
-                                Locked
-                            </Button>
-                        )}
+                                <Link
+                                    to={`/vendor/products/${item.product_id}`}
+                                    className="iv-action !px-2.5 !py-2 !text-xs !text-[#0D614E] !border-[#0D614E]/20 hover:!bg-[#0D614E]/5"
+                                    title="View order details"
+                                    state={{ product: "Stock" }}
+                                >
+                                    <FaEye aria-hidden="true" />
+                                    {/* View */}
+                                </Link>
+                            </>
+                        ) : (
+                        <Button
+                            variant="ghost"
+                            className="!px-2.5 !py-1.5 !text-xs !text-amber-700 !border-amber-200 hover:!bg-amber-50"
+                            onClick={() => onBlocked(item)}
+                            aria-label="Quantity update locked"
+                        >
+                            <Lock size={14} />
+                            Locked
+                        </Button>
+                    )}
                     {/* <Button
                         variant="ghost"
                         className="!px-2.5 !py-1.5 !text-xs !text-red-600 !border-red-200 hover:!bg-red-50"

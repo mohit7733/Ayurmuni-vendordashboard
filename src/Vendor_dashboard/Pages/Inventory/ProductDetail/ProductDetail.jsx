@@ -40,6 +40,8 @@ import "../../../components/shared/vendor-shared.css";
 import "../../../components/shared/design-system.css";
 import ProductVariantOrders from "../ProductVariantOrders";
 import "./ProductDetail.css";
+import { useLocation } from "react-router-dom";
+
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -101,7 +103,7 @@ const collectVariantImages = (variants = []) => {
         variantTitle: v.title || v.sku_code || v.vendor_sku_code,
         isCover: Boolean(
           (v.cover_image && (v.cover_image.media_url === url || v.cover_image === url)) ||
-            mediaList.find((m) => (m.media_url || m.url) === url && m.is_cover)
+          mediaList.find((m) => (m.media_url || m.url) === url && m.is_cover)
         ),
       });
     });
@@ -147,11 +149,13 @@ function DetailBlock({ icon: Icon, title, children }) {
 
 const ProductDetail = () => {
   const { id } = useParams();
+  const { state } = useLocation();
+  const productred = state?.product;
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [inventory, setInventory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(!productred ? "overview" : "orders");
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
 
