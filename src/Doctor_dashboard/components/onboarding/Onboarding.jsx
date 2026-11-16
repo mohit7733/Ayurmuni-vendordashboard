@@ -68,7 +68,7 @@ const STEP_LABELS = { 1: 'Personal', 2: 'Contact', 3: 'Professional', 4: 'Docume
 const INITIAL_FORM_STATE = {
     personalInfo: {
         title: 'Dr.', firstName: '', lastName: '', dateOfBirth: '', gender: '',
-        nationality: 'Indian', languages: ['English', 'Hindi'], bio: '', profilePhoto: null
+        nationality: 'Indian', languages: ['English', 'Hindi'], bio: '', specialized_bio: '', profilePhoto: null
     },
     contactInfo: {
         email: '', phone: '', alternatePhone: '',
@@ -125,6 +125,9 @@ const transformToApiFormat = (formData) => ({
     gender: formData.personalInfo.gender,
     nationality: formData.personalInfo.nationality,
     bio: formData.personalInfo.bio,
+    specialized_bio: formData.personalInfo.specialized_bio
+        .split(/\r?\n/)
+        .filter(entry => entry.trim()),
     languages_spoken: formData.personalInfo.languages,
     email: formData.contactInfo.email,
     secondary_number: formData.contactInfo.alternatePhone,
@@ -862,6 +865,10 @@ const DoctorOnboarding = () => {
                                         <FormTextArea label="Bio / Professional Summary" name="bio" value={formData.personalInfo.bio}
                                             onChange={(e) => handleInputChange('personalInfo', 'bio', e.target.value)}
                                             placeholder="Tell us about your professional journey, expertise, and philosophy..." />
+
+                                        <FormTextArea label="Specialized Bio" name="specialized_bio" value={formData.personalInfo.specialized_bio}
+                                            onChange={(e) => handleInputChange('personalInfo', 'specialized_bio', e.target.value)}
+                                            placeholder="Tell us about your specialized knowledge and approach..." />
 
                                         <SectionDivider title="Social Media Profiles" />
 
