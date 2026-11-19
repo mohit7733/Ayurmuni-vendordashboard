@@ -51,7 +51,7 @@ const DoctorSidebar = () => {
 
   const generalItems = [
     // { name: "Help & Support", icon: <HelpIcons />, path: "/doctor/help-support" },
-    { name: "Settings", icon: <SettingIcon />, path: "/doctor/profile?tab=settings" },
+    { name: "Settings", icon: <SettingIcon />, path: "/doctor/profile" },
   ];
 
   const syncVerifyStatus = () => {

@@ -413,10 +413,11 @@ const VendorProfile = () => {
                 setIsEditing(false);
                 let data = JSON.parse(sessionStorage.getItem('profile'));
                 if (data) {
-                    const profile = { ...data, business_name: vendorData.business_name};
+                    const profile = { ...data, business_name: vendorData.business_name, first_name: vendorData.business_name };
                     sessionStorage.setItem('profile', JSON.stringify(profile)); // Update sessionStorage with new business name
                 }
                 fetchVendorProfile();
+                window.location.reload(); // Reload the page to reflect changes
             } else {
                 toast.error(response?.data?.message || 'Failed to update profile');
             }
@@ -443,7 +444,11 @@ const VendorProfile = () => {
                         ...prev,
                         documents: { ...prev.documents, [selectedDocument]: response.data.data.url }
                     }));
-                    toast.success(`${selectedDocument.replace(/_/g, ' ')} uploaded successfully!`);
+                    toast.success(
+                        `${selectedDocument
+                            .replace(/_/g, ' ')
+                            .replace(/\b\w/g, char => char.toUpperCase())} uploaded successfully!`
+                    );
                     setShowDocumentModal(false);
                     setSelectedDocument(null);
                     setSelectedFile(null);

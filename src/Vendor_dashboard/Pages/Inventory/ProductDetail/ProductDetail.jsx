@@ -38,12 +38,16 @@ import StatusBadge from "../../../components/shared/StatusBadge";
 import { PageEmpty, PageLoader } from "../../../components/shared/PageState";
 import "../../../components/shared/vendor-shared.css";
 import "../../../components/shared/design-system.css";
+import ProductVariantOrders from "../ProductVariantOrders";
 import "./ProductDetail.css";
+import { useLocation } from "react-router-dom";
+
 
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "clinical", label: "Clinical Info" },
   { id: "variants", label: "Variants" },
+  { id: "orders", label: "Orders" },
   { id: "inventory", label: "Inventory" },
   { id: "images", label: "Images" },
   { id: "approval", label: "Approval" },
@@ -99,7 +103,7 @@ const collectVariantImages = (variants = []) => {
         variantTitle: v.title || v.sku_code || v.vendor_sku_code,
         isCover: Boolean(
           (v.cover_image && (v.cover_image.media_url === url || v.cover_image === url)) ||
-            mediaList.find((m) => (m.media_url || m.url) === url && m.is_cover)
+          mediaList.find((m) => (m.media_url || m.url) === url && m.is_cover)
         ),
       });
     });
@@ -145,11 +149,13 @@ function DetailBlock({ icon: Icon, title, children }) {
 
 const ProductDetail = () => {
   const { id } = useParams();
+  const { state } = useLocation();
+  const productred = state?.product;
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [inventory, setInventory] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(!productred ? "overview" : "orders");
   const [selectedImage, setSelectedImage] = useState(null);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
 
@@ -374,7 +380,7 @@ const ProductDetail = () => {
               <div className="pd-stat">
                 <span className="pd-stat-label">Approval</span>
                 <span className="pd-stat-value text-sm">
-                  {approvalSummary.approved} approved · {approvalSummary.pending} pending
+                  {approvalSummary.approved} Approved · {approvalSummary.pending} Pending
                 </span>
               </div>
               <div className="pd-stat">
@@ -648,6 +654,12 @@ const ProductDetail = () => {
                 );
               })
             )}
+          </div>
+        )}
+
+        {activeTab === "orders" && (
+          <div className="pd-tab-panel ds-stagger">
+            <ProductVariantOrders productId={id} variants={variants} />
           </div>
         )}
 

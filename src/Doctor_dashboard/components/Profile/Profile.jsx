@@ -1499,7 +1499,7 @@ const DoctorProfile = () => {
 
     const [doctorData, setDoctorData] = useState({
         id: "", title: "Dr.", first_name: "", last_name: "", email: "", secondary_number: "",
-        dob: "", gender: "", nationality: "Indian", languages_spoken: [], bio: "",
+        dob: "", gender: "", nationality: "Indian", languages_spoken: [], bio: "", specialized_bio: "",
         address_line: "", city: "", state: "", pincode: "", country: "India",
         emergency_contact_name: "", emergency_contact_relation: "", emergency_contact_phone: "",
         specializations: [], experience_years: "", qualification: "", registration_number: "",
@@ -1661,9 +1661,13 @@ const DoctorProfile = () => {
             } else {
                 sessionStorage.setItem('profile', JSON.stringify({ ...JSON.parse(data), verify: false }));
             }
+            const specializedBio = profile?.specialized_Bio ?? profile?.specialized_bio;
             setDoctorData(prev => ({
                 ...prev,
                 ...profile,
+                specialized_bio: Array.isArray(specializedBio)
+                    ? specializedBio.join('\n')
+                    : specializedBio || "",
                 bank_details: profile?.bank_details && Array.isArray(profile.bank_details) ? profile.bank_details : [{
                     account_holder_name: profile?.account_holder_name || "",
                     account_number: profile?.account_number || "",
@@ -1773,13 +1777,16 @@ const DoctorProfile = () => {
                 is_panchakarma_certified: doctorData.is_panchakarma_certified, ayurveda_practice_years: doctorData.ayurveda_practice_years,
                 ayurvedic_council_id: doctorData.ayurvedic_council_id, practicing_since: doctorData.practicing_since,
                 linkedin_url: doctorData.linkedin_url, twitter_url: doctorData.twitter_url, facebook_url: doctorData.facebook_url,
-                instagram_url: doctorData.instagram_url
+                instagram_url: doctorData.instagram_url,
+                specialized_bio: doctorData.specialized_bio
+                    .split(/\r?\n/)
+                    .filter(entry => entry.trim()),
             };
             await doctorService.updateProfile(updateData);
             toast.success('Profile updated successfully!');
             let data = sessionStorage.getItem('profile');
             sessionStorage.setItem('profile', JSON.stringify({ ...JSON.parse(data), first_name: doctorData.first_name, last_name: doctorData.last_name }));
-            window.location.reload()
+            // window.location.reload()
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to update profile');
         } finally {
@@ -1870,7 +1877,11 @@ const DoctorProfile = () => {
                 ...prev,
                 documents: { ...prev.documents, [selectedDocument]: response.url }
             }));
-            toast.success(`${selectedDocument.replace(/_/g, ' ')} uploaded successfully!`);
+            toast.success(
+                `${selectedDocument
+                    .replace(/_/g, ' ')
+                    .replace(/\b\w/g, char => char.toUpperCase())} uploaded successfully!`
+            );
             setShowDocumentModal(false);
             setSelectedDocument(null);
             setSelectedFile(null);
@@ -2189,6 +2200,10 @@ const DoctorProfile = () => {
 
                                     <SectionHeader title="Professional Bio" />
                                     <FormTextArea value={doctorData.bio} onChange={(e) => handleInputChange('bio', e.target.value)} onBlur={() => handleBlurValidation('bio')} disabled={!isEditing} placeholder="Tell us about your professional journey, expertise, and philosophy..." error={validationErrors.bio} />
+
+                                    <SectionHeader title="Specialized Bio" />
+                                    <FormTextArea value={doctorData.specialized_bio} onChange={(e) => handleInputChange('specialized_bio', e.target.value)} onBlur={() => handleBlurValidation('specialized_bio')} disabled={!isEditing} placeholder="Tell us about your specialized knowledge and approach..." error={validationErrors.specialized_bio} />
+
 
                                     <SectionHeader title="Social Media Profiles" />
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

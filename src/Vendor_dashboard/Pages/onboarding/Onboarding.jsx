@@ -3,8 +3,7 @@ import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
     Building, Store, MapPin, FileText, Upload, CheckCircle, AlertCircle,
     ChevronRight, Trash2, Eye, Award, Shield, Sparkles, Gift, RefreshCw,
-    X, ArrowLeft, Info, Banknote, FileCheck,
-    LogOut
+    X, ArrowLeft, Info, Banknote, FileCheck
 } from 'lucide-react';
 import { vendorService } from '../../../services/vendorService';
 import { acceptLegalPolicies } from '../../../services/policyService';
@@ -196,7 +195,7 @@ const StepIndicator = ({ steps, currentStep, labels }) => {
     );
 };
 
-const FormInput = ({ label, name, value, onChange, error, required, placeholder,max,disabled, type = "text", ...props }) => (
+const FormInput = ({ label, name, value, onChange, error, required, placeholder, type = "text", ...props }) => (
     <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">
             {label} {required && <span className="text-rose-500">*</span>}
@@ -205,23 +204,9 @@ const FormInput = ({ label, name, value, onChange, error, required, placeholder,
             type={type}
             name={name}
             value={value}
-            onChange={(e) => {
-                if (type === "number" && Number(e.target.value) < 0) return;
-                onChange(e);
-            }}
-            onKeyDown={(e) => {
-                if (type === "number" && ["-", "e", "E"].includes(e.key)) {
-                    e.preventDefault();
-                }
-            }}
+            onChange={onChange}
             placeholder={placeholder}
-            maxLength={max}
-            max={max}
-            min={type === "number" ? 0 : undefined}
-            disabled={disabled}
-            className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${error
-                ? "border-rose-500 focus:ring-rose-500 bg-rose-50"
-                : "border-gray-200 focus:ring-[#0D614E]"
+            className={`w-full px-4 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all ${error ? 'border-rose-500 focus:ring-rose-500 bg-rose-50' : 'border-gray-200 focus:ring-[#0D614E]'
                 }`}
             {...props}
         />
@@ -500,7 +485,7 @@ const VendorOnboarding = () => {
                 if (!formData.businessInfo.ayushLicenseNumber?.trim()) newErrors.ayushLicenseNumber = "AYUSH license number is required";
                 else if (!VALIDATION_PATTERNS.ayush.test(formData.businessInfo.ayushLicenseNumber)) newErrors.ayushLicenseNumber = "Invalid AYUSH license number format";
 
-                if (!formData.businessInfo.website?.trim() || !VALIDATION_PATTERNS.website.test(formData.businessInfo.website)) newErrors.website = "website formate is not valid";
+                if (!formData.businessInfo.website?.trim() && !VALIDATION_PATTERNS.website.test(formData.businessInfo.website)) newErrors.website = "website formate is not valid";
 
                 break;
 
@@ -641,29 +626,8 @@ const VendorOnboarding = () => {
     }, [currentStep]);
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 relative">
+        <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
             <SuccessModal show={showSuccess} />
-            <button
-                type="button"
-                onClick={() => {
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    window.location.href = "/login";
-                }}
-                className="mt-8 inline-flex items-center gap-2 px-4 py-2
-                bg-white text-[#0D614E] font-semibold rounded-xl
-                hover:bg-emerald-50 transition-all duration-200
-                shadow-md"
-                style={{
-                    position: 'absolute',
-                    right: '20px',
-                    top: "-10px",
-                }}
-            >
-                <LogOut size={18} />
-                Logout
-            </button>
-
             <CelebrationParticles show={showCelebration} />
 
             {/* Header */}
@@ -948,7 +912,7 @@ const VendorOnboarding = () => {
                         </div>
 
                         {/* Navigation Buttons */}
-                        <div className="flex flex-wrap justify-between items-center gap-3 px-4 py-4 sm:px-8 sm:py-6 bg-gray-50 border-t border-gray-200 mt-8 rounded-b-2xl">
+                        <div className="flex justify-between items-center px-8 py-6 bg-gray-50 border-t border-gray-200 mt-8 rounded-b-2xl">
                             <button type="button" onClick={prevStep}
                                 className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl transition-all ${currentStep > 1 ? 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:shadow-md'
                                     : 'opacity-50 cursor-not-allowed bg-gray-100 text-gray-400'

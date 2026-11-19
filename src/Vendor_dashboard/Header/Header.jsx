@@ -359,7 +359,7 @@ const Header = () => {
                                     role="menuitem"
                                     onClick={() => {
                                         setOpenProfile(false);
-                                        navigate("/vendor/profile?tab=settings");
+                                        navigate("/vendor/profile");
                                     }}
                                 >
                                     <Settings size={16} />
