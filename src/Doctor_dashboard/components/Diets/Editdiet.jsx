@@ -876,7 +876,7 @@ const DietPlanManager = () => {
 
         return {
             name: formData.name,
-            prakriti: formData.prakriti,
+            prakriti: formData.prakriti ? formData.prakriti : null,
             season: formData.season,
             health_diseases: formData.health_diseases,
             is_personalized_plan: formData.is_personalized_plan,
@@ -1556,13 +1556,13 @@ const DietPlanManager = () => {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Prakriti <span className="text-red-500">*</span>
+                                    Prakriti
+                                    {/* <span className="text-red-500">*</span> */}
                                 </label>
                                 <select
                                     name="prakriti"
                                     value={formData.prakriti}
                                     onChange={handleInputChange}
-                                    required
                                 >
                                     <option value="">Select Prakriti</option>
                                     <option value="Vata">Vata</option>

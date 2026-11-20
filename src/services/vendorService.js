@@ -47,6 +47,9 @@ export const vendorService = {
     getProducts: (params = {}) =>
         API.get(`/vendors/product/${buildQuery(params)}`),
 
+    getProductCatalogue: (params = {}) =>
+        API.get(`/vendors/product/catalogue/${buildQuery(params)}`),
+
     getSingleProduct: (id, variantId) => {
         const query = variantId
             ? `?id=${id}&variant_id=${variantId}`

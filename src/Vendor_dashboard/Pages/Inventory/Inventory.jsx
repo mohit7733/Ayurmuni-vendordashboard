@@ -4,11 +4,13 @@ import Ayurvedaimage from "../../../Assests/Ayurvedaimage.png";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaEdit, FaEye } from "react-icons/fa";
 import { FiTrash2 } from "react-icons/fi";
+import { Download } from "lucide-react";
 import toast from "react-hot-toast";
 import { vendorService } from "../../../services/vendorService";
 import UnicommerceNotice from "../../components/shared/UnicommerceNotice";
 import DashboardPageShell from "../../components/shared/DashboardPageShell";
 import Button from "../../components/shared/Button";
+import Modal from "../../components/shared/Modal";
 import { PageEmpty, PageError, PaginationBar } from "../../components/shared/PageState";
 import { ProductListSkeleton } from "../../components/shared/Skeleton";
 import StatusBadge from "../../components/shared/StatusBadge";
@@ -21,6 +23,11 @@ import {
   mapVariantFromApi,
   UNICOMMERCE_NOTICES,
 } from "../../../utils/unicommerceHelpers";
+import {
+  extractApiErrorMessage,
+  exportRowsToExcel,
+  mapCatalogueToRows,
+} from "../../utils/exportHelpers";
 import "../../components/shared/vendor-shared.css";
 
 const LOW_STOCK_THRESHOLD = 10;
@@ -53,6 +60,101 @@ const FILTER_ORDER = [
   "inactive",
   "draft",
 ];
+
+const STOCK_FILTER_KEYS = new Set(["in_stock", "low_stock", "out_of_stock"]);
+const APPROVAL_FILTER_KEYS = new Set([
+  "pending",
+  "approved",
+  "rejected",
+  "suspended",
+  "pending_approval",
+]);
+const VARIANT_STATUS_KEYS = new Set(["draft", "active", "inactive"]);
+
+const CATALOG_TYPE_OPTIONS = [
+  { value: "all", label: "All catalogue" },
+  { value: "products", label: "Products" },
+  { value: "medicines", label: "Medicines" },
+];
+
+const APPROVAL_STATUS_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+  { value: "suspended", label: "Suspended" },
+];
+
+const VARIANT_STATUS_OPTIONS = [
+  { value: "draft", label: "Draft" },
+  { value: "active", label: "Active" },
+  { value: "inactive", label: "Inactive" },
+];
+
+const STOCK_STATUS_OPTIONS = [
+  { value: "in_stock", label: "In stock" },
+  { value: "low_stock", label: "Low stock" },
+  { value: "out_of_stock", label: "Out of stock" },
+];
+
+const BOOL_FILTER_OPTIONS = [
+  { value: "true", label: "Yes" },
+  { value: "false", label: "No" },
+];
+
+const DATE_INPUT_CLASS =
+  "box-border h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#0D614E]/30 focus:border-[#0D614E]/40";
+
+const SELECT_FULL_CLASS = "w-full";
+
+const DEFAULT_DOWNLOAD_FILTERS = {
+  catalogType: "all",
+  search: "",
+  brandId: "",
+  serviceCategoryId: "",
+  approvalStatus: "",
+  variantStatus: "",
+  stockStatus: "",
+  isActive: "",
+  isFeatured: "",
+  isNutrition: "",
+  fromDate: "",
+  toDate: "",
+};
+
+function mapTabFilterToCatalogueParams(stockFilter) {
+  if (!stockFilter || stockFilter === "all") return {};
+  if (STOCK_FILTER_KEYS.has(stockFilter)) return { stock: stockFilter };
+  if (stockFilter === "pending_approval") return { approval_status: "pending" };
+  if (APPROVAL_FILTER_KEYS.has(stockFilter)) return { approval_status: stockFilter };
+  if (VARIANT_STATUS_KEYS.has(stockFilter)) return { variant_status: stockFilter };
+  return {};
+}
+
+function buildCatalogueQuery(filters = {}) {
+  return {
+    catalog: filters.catalogType && filters.catalogType !== "all" ? filters.catalogType : undefined,
+    search: filters.search || undefined,
+    brand_id: filters.brandId || undefined,
+    service_category_id: filters.serviceCategoryId || undefined,
+    approval_status: filters.approvalStatus || undefined,
+    variant_status: filters.variantStatus || undefined,
+    stock: filters.stockStatus || undefined,
+    is_active: filters.isActive || undefined,
+    is_featured: filters.isFeatured || undefined,
+    is_nutrition: filters.isNutrition || undefined,
+    from_date: filters.fromDate || undefined,
+    to_date: filters.toDate || undefined,
+  };
+}
+
+function CatalogueFilterField({ label, children }) {
+  return (
+    <label className="block space-y-1.5">
+      <span className="text-xs font-semibold text-gray-600">{label}</span>
+      {children}
+    </label>
+  );
+}
 
 function labelForKey(key) {
   if (FILTER_LABELS[key]) return FILTER_LABELS[key];
@@ -390,6 +492,9 @@ export default function InventoryVault() {
   const [serviceCategoryId, setServiceCategoryId] = useState("");
   const [stockFilter, setStockFilter] = useState("all");
   const [pageSize, setPageSize] = usePersistedState("vendor:inventory:pageSize", 10);
+  const [downloadModalOpen, setDownloadModalOpen] = useState(false);
+  const [downloadFilters, setDownloadFilters] = useState(DEFAULT_DOWNLOAD_FILTERS);
+  const [downloadingCatalogue, setDownloadingCatalogue] = useState(false);
   const safePageSize = clampPageSize(pageSize);
 
   const listQuery = useMemo(
@@ -550,6 +655,33 @@ export default function InventoryVault() {
     setCurrentPage(1);
   };
 
+  const updateDownloadFilter = (key, value) => {
+    setDownloadFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const openDownloadModal = () => {
+    const fromTab = mapTabFilterToCatalogueParams(stockFilter);
+    setDownloadFilters({
+      ...DEFAULT_DOWNLOAD_FILTERS,
+      search: search || searchInput || "",
+      brandId,
+      serviceCategoryId,
+      approvalStatus: fromTab.approval_status || "",
+      variantStatus: fromTab.variant_status || "",
+      stockStatus: fromTab.stock || "",
+    });
+    setDownloadModalOpen(true);
+  };
+
+  const closeDownloadModal = () => {
+    if (downloadingCatalogue) return;
+    setDownloadModalOpen(false);
+  };
+
+  const resetDownloadFilters = () => {
+    setDownloadFilters({ ...DEFAULT_DOWNLOAD_FILTERS });
+  };
+
   const handleDeleteProduct = async (product) => {
     if (!window.confirm(`Delete "${product.name}" and all its variants?`)) return;
     try {
@@ -573,6 +705,48 @@ export default function InventoryVault() {
     }
   };
 
+  const handleDownloadCatalogue = async () => {
+    if (downloadingCatalogue) return;
+    const catalogueQuery = buildCatalogueQuery(downloadFilters);
+    try {
+      setDownloadingCatalogue(true);
+      const allResults = [];
+      let page = 1;
+      const cataloguePageSize = 100;
+      const maxPages = 50;
+
+      while (page <= maxPages) {
+        const response = await vendorService.getProductCatalogue({
+          ...catalogueQuery,
+          page,
+          page_size: cataloguePageSize,
+        });
+        const payload = response?.data?.data || {};
+        const results = Array.isArray(payload.results) ? payload.results : [];
+        allResults.push(...results);
+
+        if (!results.length || !payload.next) break;
+        page += 1;
+      }
+
+      if (!allResults.length) {
+        toast.error("No products found for the selected filters");
+        return;
+      }
+
+      const rows = mapCatalogueToRows(allResults);
+      const stamp = new Date().toISOString().slice(0, 10);
+      const catalogLabel = catalogueQuery.catalog || "all";
+      exportRowsToExcel(`product-catalogue-${catalogLabel}-${stamp}.xlsx`, rows);
+      toast.success(`Downloaded ${rows.length} product variant${rows.length > 1 ? "s" : ""}`);
+      setDownloadModalOpen(false);
+    } catch (err) {
+      toast.error(extractApiErrorMessage(err) || "Failed to download product catalogue");
+    } finally {
+      setDownloadingCatalogue(false);
+    }
+  };
+
   return (
     <DashboardPageShell
       title="Product"
@@ -589,6 +763,10 @@ export default function InventoryVault() {
               {lowStockCount} low stock variant{lowStockCount > 1 ? "s" : ""}
             </Button>
           )}
+          <Button variant="secondary" onClick={openDownloadModal}>
+            <Download size={16} />
+            Download Product Catalogue
+          </Button>
           <Button variant="secondary" onClick={() => navigate("/vendor/bulk-upload-products")}>
             Bulk Upload
           </Button>
@@ -749,6 +927,169 @@ export default function InventoryVault() {
           />
         </>
       )}
+
+      <Modal
+        open={downloadModalOpen}
+        onClose={closeDownloadModal}
+        title="Download Product Catalogue"
+        subtitle="Choose filters, then download the matching variants as Excel."
+        size="lg"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={resetDownloadFilters}
+              disabled={downloadingCatalogue}
+            >
+              Reset
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={closeDownloadModal}
+              disabled={downloadingCatalogue}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDownloadCatalogue}
+              loading={downloadingCatalogue}
+              disabled={downloadingCatalogue}
+            >
+              {!downloadingCatalogue && <Download size={16} />}
+              Download Excel
+            </Button>
+          </>
+        }
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <CatalogueFilterField label="Catalogue type">
+            <SelectFilter
+              value={downloadFilters.catalogType}
+              onChange={(e) => updateDownloadFilter("catalogType", e.target.value || "all")}
+              options={CATALOG_TYPE_OPTIONS}
+              aria-label="Catalogue type"
+              className={SELECT_FULL_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="Search">
+            <input
+              type="search"
+              value={downloadFilters.search}
+              onChange={(e) => updateDownloadFilter("search", e.target.value)}
+              placeholder="Product, brand, or SKU"
+              className={DATE_INPUT_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="Brand">
+            <SelectFilter
+              value={downloadFilters.brandId}
+              onChange={(e) => updateDownloadFilter("brandId", e.target.value)}
+              options={brandOptions}
+              placeholder="All brands"
+              aria-label="Brand"
+              className={SELECT_FULL_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="Service category">
+            <SelectFilter
+              value={downloadFilters.serviceCategoryId}
+              onChange={(e) => updateDownloadFilter("serviceCategoryId", e.target.value)}
+              options={serviceCategoryOptions}
+              placeholder="All service categories"
+              aria-label="Service category"
+              className={SELECT_FULL_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="Approval status">
+            <SelectFilter
+              value={downloadFilters.approvalStatus}
+              onChange={(e) => updateDownloadFilter("approvalStatus", e.target.value)}
+              options={APPROVAL_STATUS_OPTIONS}
+              placeholder="All approval statuses"
+              aria-label="Approval status"
+              className={SELECT_FULL_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="Variant status">
+            <SelectFilter
+              value={downloadFilters.variantStatus}
+              onChange={(e) => updateDownloadFilter("variantStatus", e.target.value)}
+              options={VARIANT_STATUS_OPTIONS}
+              placeholder="All variant statuses"
+              aria-label="Variant status"
+              className={SELECT_FULL_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="Stock">
+            <SelectFilter
+              value={downloadFilters.stockStatus}
+              onChange={(e) => updateDownloadFilter("stockStatus", e.target.value)}
+              options={STOCK_STATUS_OPTIONS}
+              placeholder="All stock levels"
+              aria-label="Stock"
+              className={SELECT_FULL_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="Active">
+            <SelectFilter
+              value={downloadFilters.isActive}
+              onChange={(e) => updateDownloadFilter("isActive", e.target.value)}
+              options={BOOL_FILTER_OPTIONS}
+              placeholder="Any"
+              aria-label="Active"
+              className={SELECT_FULL_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="Featured">
+            <SelectFilter
+              value={downloadFilters.isFeatured}
+              onChange={(e) => updateDownloadFilter("isFeatured", e.target.value)}
+              options={BOOL_FILTER_OPTIONS}
+              placeholder="Any"
+              aria-label="Featured"
+              className={SELECT_FULL_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="Nutrition">
+            <SelectFilter
+              value={downloadFilters.isNutrition}
+              onChange={(e) => updateDownloadFilter("isNutrition", e.target.value)}
+              options={BOOL_FILTER_OPTIONS}
+              placeholder="Any"
+              aria-label="Nutrition"
+              className={SELECT_FULL_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="From date">
+            <input
+              type="date"
+              value={downloadFilters.fromDate}
+              onChange={(e) => updateDownloadFilter("fromDate", e.target.value)}
+              className={DATE_INPUT_CLASS}
+            />
+          </CatalogueFilterField>
+
+          <CatalogueFilterField label="To date">
+            <input
+              type="date"
+              value={downloadFilters.toDate}
+              onChange={(e) => updateDownloadFilter("toDate", e.target.value)}
+              min={downloadFilters.fromDate || undefined}
+              className={DATE_INPUT_CLASS}
+            />
+          </CatalogueFilterField>
+        </div>
+      </Modal>
     </DashboardPageShell>
   );
 }

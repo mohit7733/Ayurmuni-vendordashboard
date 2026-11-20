@@ -262,7 +262,7 @@ const EditDoDonts = () => {
     });
 
     const validate = (payload) => {
-        if (!payload.prakriti) return "Please select a prakriti.";
+        // if (!payload.prakriti) return "Please select a prakriti.";
         if (!payload.health_diseases.length) return "Please add at least one health condition.";
         if (!payload.dos.length) return "Please add at least one Do.";
         if (!payload.donts.length) return "Please add at least one Don't.";
@@ -364,13 +364,14 @@ const EditDoDonts = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                                    Prakriti <span className="text-red-500">*</span>
+                                    Prakriti
+                                     {/* <span className="text-red-500">*</span> */}
                                 </label>
                                 <select
                                     name="prakriti"
                                     value={formData.prakriti}
                                     onChange={(e) => setFormData((prev) => ({ ...prev, prakriti: e.target.value }))}
-                                    required
+                                    // required
                                 >
                                     <option value="">Select Prakriti</option>
                                     {PRAKRITI_OPTIONS.map((option) => (
