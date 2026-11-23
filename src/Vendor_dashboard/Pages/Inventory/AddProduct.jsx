@@ -111,6 +111,7 @@ export default function AddProduct() {
     ],
     weightage: "g",
     size: "",
+    expire_at: "",
     is_default: false,
     prescription_required: false,
     coverImage: null,
@@ -518,6 +519,16 @@ export default function AddProduct() {
       return false;
     }
 
+    if (variantForm.expire_at) {
+      const minExpiry = new Date();
+      minExpiry.setMonth(minExpiry.getMonth() + 1);
+      const minExpiryStr = minExpiry.toISOString().split("T")[0];
+      if (variantForm.expire_at < minExpiryStr) {
+        toast.error("Expiry date must be at least 1 month from today");
+        return false;
+      }
+    }
+
     return true;
   };
 
@@ -579,6 +590,7 @@ export default function AddProduct() {
         physical_state: variantForm.physical_state,
         weightage: variantForm.weightage,
         size: variantForm.size,
+        expire_at: variantForm.expire_at || "",
         is_default: editingVariant ? variantForm.is_default : (variants.length === 0),
         prescription_required: variantForm.prescription_required,
         coverImage: variantForm.coverImage,
@@ -649,6 +661,7 @@ export default function AddProduct() {
       ],
       weightage: "g",
       size: "",
+      expire_at: "",
       is_default: false,
       prescription_required: false,
       coverImage: null,
@@ -687,6 +700,7 @@ export default function AddProduct() {
       physical_state: variant.physical_state,
       weightage: variant.weightage,
       size: variant.size,
+      expire_at: variant.expire_at ? String(variant.expire_at).split("T")[0] : "",
       is_default: variant.is_default,
       prescription_required: variant.prescription_required,
       coverImage: variant.coverImage || (restoredGallery.find(img => img.is_cover) || restoredGallery[0]),
@@ -1646,6 +1660,24 @@ export default function AddProduct() {
                   )}
                 </div>
               </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Expiry Date</label>
+                  <input
+                    type="date"
+                    name="expire_at"
+                    value={variantForm.expire_at}
+                    onChange={handleVariantInputChange}
+                    min={(() => {
+                      const d = new Date();
+                      d.setMonth(d.getMonth() + 1);
+                      return d.toISOString().split("T")[0];
+                    })()}
+                  />
+                </div>
+              </div>
+
               <div className="form-row">
                 <div className="form-group">
                   <label className="checkbox-label">
