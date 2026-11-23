@@ -5,6 +5,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { FaEdit, FaEye } from "react-icons/fa";
 import { FiTrash2 } from "react-icons/fi";
 import { Download } from "lucide-react";
+import JsBarcode from "jsbarcode";
+import JSZip from "jszip";
 import toast from "react-hot-toast";
 import { vendorService } from "../../../services/vendorService";
 import UnicommerceNotice from "../../components/shared/UnicommerceNotice";
@@ -172,6 +174,92 @@ function clampPageSize(pageSize) {
   return Math.min(Math.max(1, size), PRODUCT_PAGE_SIZE_MAX);
 }
 
+function sanitizeFilenamePart(value, fallback = "item") {
+  return String(value || "")
+    .trim()
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 80) || fallback;
+}
+
+function createSkuBarcodeCanvas(sku) {
+  const value = String(sku || "").trim();
+  if (!value) {
+    throw new Error("SKU is missing");
+  }
+
+  const canvas = document.createElement("canvas");
+  JsBarcode(canvas, value, {
+    format: "CODE128",
+    displayValue: true,
+    fontSize: 16,
+    height: 80,
+    margin: 16,
+    background: "#ffffff",
+    lineColor: "#000000",
+  });
+  return canvas;
+}
+
+function canvasToPngBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("Failed to create barcode image"));
+        return;
+      }
+      resolve(blob);
+    }, "image/png");
+  });
+}
+
+function triggerBlobDownload(blob, filename) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+
+function downloadSkuBarcode(sku, productName = "") {
+  const value = String(sku || "").trim();
+  if (!value) {
+    toast.error("SKU is missing for this variant");
+    return;
+  }
+
+  try {
+    const canvas = createSkuBarcodeCanvas(value);
+    const namePart = sanitizeFilenamePart(productName, "product");
+    const skuPart = sanitizeFilenamePart(value, "sku");
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = `${namePart}-${skuPart}-barcode.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("Barcode downloaded");
+  } catch (error) {
+    toast.error(error?.message || "Failed to generate barcode");
+  }
+}
+
+function buildBarcodeZipEntryName(productName, sku, usedNames) {
+  const namePart = sanitizeFilenamePart(productName, "product");
+  const skuPart = sanitizeFilenamePart(sku, "sku");
+  let base = `${namePart}-${skuPart}-barcode.png`;
+  let candidate = base;
+  let index = 2;
+  while (usedNames.has(candidate)) {
+    candidate = `${namePart}-${skuPart}-barcode-${index}.png`;
+    index += 1;
+  }
+  usedNames.add(candidate);
+  return candidate;
+}
+
 function parseProductListResponse(response) {
   const data = response?.data?.data || {};
   const results = Array.isArray(data.results) ? data.results : [];
@@ -295,6 +383,7 @@ function VariantRow({ product, variant, onToggleStatus }) {
   const qty = getVariantQuantity(variant);
   const stockStatus = getVariantStatus(qty);
   const avatarUrl = getVariantCoverImageUrl(variant) || Ayurvedaimage;
+  const barcodeSku = String(variant.sku_code || "").trim();
 
   return (
     <tr>
@@ -324,6 +413,17 @@ function VariantRow({ product, variant, onToggleStatus }) {
               {variant.sku_code}
             </code>
           )}
+          <button
+            type="button"
+            className="iv-barcode-download"
+            onClick={() => downloadSkuBarcode(barcodeSku, product.name || variant.title)}
+            disabled={!barcodeSku}
+            title={barcodeSku ? `Download barcode for ${barcodeSku}` : "SKU required to download barcode"}
+            aria-label={barcodeSku ? `Download barcode for ${barcodeSku}` : "SKU required to download barcode"}
+          >
+            <Download size={14} aria-hidden="true" />
+            Download barcode
+          </button>
         </div>
       </td>
       <td>₹{Number(variant.mrp || 0).toLocaleString()}</td>
@@ -495,6 +595,8 @@ export default function InventoryVault() {
   const [downloadModalOpen, setDownloadModalOpen] = useState(false);
   const [downloadFilters, setDownloadFilters] = useState(DEFAULT_DOWNLOAD_FILTERS);
   const [downloadingCatalogue, setDownloadingCatalogue] = useState(false);
+  const [downloadingBarcodes, setDownloadingBarcodes] = useState(false);
+  const isDownloadingExport = downloadingCatalogue || downloadingBarcodes;
   const safePageSize = clampPageSize(pageSize);
 
   const listQuery = useMemo(
@@ -674,12 +776,35 @@ export default function InventoryVault() {
   };
 
   const closeDownloadModal = () => {
-    if (downloadingCatalogue) return;
+    if (isDownloadingExport) return;
     setDownloadModalOpen(false);
   };
 
   const resetDownloadFilters = () => {
     setDownloadFilters({ ...DEFAULT_DOWNLOAD_FILTERS });
+  };
+
+  const fetchCatalogueResults = async (catalogueQuery) => {
+    const allResults = [];
+    let page = 1;
+    const cataloguePageSize = 100;
+    const maxPages = 50;
+
+    while (page <= maxPages) {
+      const response = await vendorService.getProductCatalogue({
+        ...catalogueQuery,
+        page,
+        page_size: cataloguePageSize,
+      });
+      const payload = response?.data?.data || {};
+      const results = Array.isArray(payload.results) ? payload.results : [];
+      allResults.push(...results);
+
+      if (!results.length || !payload.next) break;
+      page += 1;
+    }
+
+    return allResults;
   };
 
   const handleDeleteProduct = async (product) => {
@@ -706,28 +831,11 @@ export default function InventoryVault() {
   };
 
   const handleDownloadCatalogue = async () => {
-    if (downloadingCatalogue) return;
+    if (isDownloadingExport) return;
     const catalogueQuery = buildCatalogueQuery(downloadFilters);
     try {
       setDownloadingCatalogue(true);
-      const allResults = [];
-      let page = 1;
-      const cataloguePageSize = 100;
-      const maxPages = 50;
-
-      while (page <= maxPages) {
-        const response = await vendorService.getProductCatalogue({
-          ...catalogueQuery,
-          page,
-          page_size: cataloguePageSize,
-        });
-        const payload = response?.data?.data || {};
-        const results = Array.isArray(payload.results) ? payload.results : [];
-        allResults.push(...results);
-
-        if (!results.length || !payload.next) break;
-        page += 1;
-      }
+      const allResults = await fetchCatalogueResults(catalogueQuery);
 
       if (!allResults.length) {
         toast.error("No products found for the selected filters");
@@ -744,6 +852,62 @@ export default function InventoryVault() {
       toast.error(extractApiErrorMessage(err) || "Failed to download product catalogue");
     } finally {
       setDownloadingCatalogue(false);
+    }
+  };
+
+  const handleDownloadBarcodes = async () => {
+    if (isDownloadingExport) return;
+    const catalogueQuery = buildCatalogueQuery(downloadFilters);
+    try {
+      setDownloadingBarcodes(true);
+      const allResults = await fetchCatalogueResults(catalogueQuery);
+
+      if (!allResults.length) {
+        toast.error("No products found for the selected filters");
+        return;
+      }
+
+      const zip = new JSZip();
+      const usedNames = new Set();
+      let generatedCount = 0;
+      let skippedCount = 0;
+
+      for (const item of allResults) {
+        const sku = String(item?.sku_code || "").trim();
+        if (!sku) {
+          skippedCount += 1;
+          continue;
+        }
+
+        try {
+          const productName = item?.product?.name || item?.title || "product";
+          const canvas = createSkuBarcodeCanvas(sku);
+          const blob = await canvasToPngBlob(canvas);
+          const filename = buildBarcodeZipEntryName(productName, sku, usedNames);
+          zip.file(filename, blob);
+          generatedCount += 1;
+        } catch {
+          skippedCount += 1;
+        }
+      }
+
+      if (!generatedCount) {
+        toast.error("No SKU codes found to generate barcodes");
+        return;
+      }
+
+      const stamp = new Date().toISOString().slice(0, 10);
+      const catalogLabel = catalogueQuery.catalog || "all";
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      triggerBlobDownload(zipBlob, `sku-barcodes-${catalogLabel}-${stamp}.zip`);
+
+      const skipNote = skippedCount ? ` (${skippedCount} skipped)` : "";
+      toast.success(`Downloaded ${generatedCount} barcode${generatedCount > 1 ? "s" : ""}${skipNote}`);
+      setDownloadModalOpen(false);
+    } catch (err) {
+      toast.error(extractApiErrorMessage(err) || "Failed to download barcodes");
+    } finally {
+      setDownloadingBarcodes(false);
     }
   };
 
@@ -765,7 +929,7 @@ export default function InventoryVault() {
           )}
           <Button variant="secondary" onClick={openDownloadModal}>
             <Download size={16} />
-            Download Product Catalogue
+            Download Catalogue / Barcodes
           </Button>
           <Button variant="secondary" onClick={() => navigate("/vendor/bulk-upload-products")}>
             Bulk Upload
@@ -931,29 +1095,38 @@ export default function InventoryVault() {
       <Modal
         open={downloadModalOpen}
         onClose={closeDownloadModal}
-        title="Download Product Catalogue"
-        subtitle="Choose filters, then download the matching variants as Excel."
+        title="Download Catalogue / Barcodes"
+        subtitle="Choose filters, then download matching variants as Excel or SKU barcode images (ZIP)."
         size="lg"
         footer={
           <>
             <Button
               variant="secondary"
               onClick={resetDownloadFilters}
-              disabled={downloadingCatalogue}
+              disabled={isDownloadingExport}
             >
               Reset
             </Button>
             <Button
               variant="secondary"
               onClick={closeDownloadModal}
-              disabled={downloadingCatalogue}
+              disabled={isDownloadingExport}
             >
               Cancel
             </Button>
             <Button
+              variant="secondary"
+              onClick={handleDownloadBarcodes}
+              loading={downloadingBarcodes}
+              disabled={isDownloadingExport}
+            >
+              {!downloadingBarcodes && <Download size={16} />}
+              Download Barcodes
+            </Button>
+            <Button
               onClick={handleDownloadCatalogue}
               loading={downloadingCatalogue}
-              disabled={downloadingCatalogue}
+              disabled={isDownloadingExport}
             >
               {!downloadingCatalogue && <Download size={16} />}
               Download Excel

@@ -812,6 +812,33 @@ body {
   font-family: monospace;
 }
 
+.iv-barcode-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: #0D614E;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.iv-barcode-download:hover:not(:disabled) {
+  background: #e8f5f2;
+  border-color: #0D614E;
+}
+
+.iv-barcode-download:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Price Styles */
 .iv-price-mrp {
   font-size: 13px;
