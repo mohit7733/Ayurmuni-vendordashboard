@@ -326,6 +326,7 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
     const [chatAccess, setChatAccess] = useState(null);
     const [isSending, setIsSending] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [pendingImage, setPendingImage] = useState(null); // { file, previewUrl }
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -833,11 +834,41 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
     const filteredPatients = patients;
 
     const canSend = Boolean(chatAccess?.can_send);
+    const hasPendingImage = Boolean(pendingImage?.file);
+    const canSubmit = Boolean(
+        (inputMessage.trim() || hasPendingImage) && canSend && !isSending && !isUploading
+    );
+
+    const clearPendingImage = useCallback(() => {
+        setPendingImage((prev) => {
+            if (prev?.previewUrl) {
+                URL.revokeObjectURL(prev.previewUrl);
+            }
+            return null;
+        });
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    }, []);
+
+    useEffect(() => () => {
+        if (pendingImage?.previewUrl) {
+            URL.revokeObjectURL(pendingImage.previewUrl);
+        }
+    }, [pendingImage?.previewUrl]);
+
+    // Drop draft attachment when switching patients
+    useEffect(() => {
+        clearPendingImage();
+    }, [selectedPatientId, clearPendingImage]);
 
     const handleSendMessage = async () => {
-        if (!inputMessage.trim() || !selectedPatient || !canSend || isSending) return;
+        if (!selectedPatient || !canSend || isSending || isUploading) return;
 
         const text = inputMessage.trim();
+        const imageFile = pendingImage?.file || null;
+        if (!text && !imageFile) return;
+
         const { patientId } = selectedPatient;
         const appointmentId = selectedPatientRef.current?.appointmentId
             || chatAccess?.active_appointment_id;
@@ -847,13 +878,26 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
         }
 
         setInputMessage('');
+        const draftImage = pendingImage;
+        clearPendingImage();
         setIsSending(true);
 
         try {
-            const sentViaWs = wsConnectionRef.current?.sendChatMessage({ text });
+            let attachments;
+            if (imageFile) {
+                setIsUploading(true);
+                const attachment = await uploadChatImage(imageFile);
+                attachments = [attachment];
+            }
+
+            const payload = attachments
+                ? { text: text || '', attachments }
+                : { text };
+
+            const sentViaWs = wsConnectionRef.current?.sendChatMessage(payload);
 
             if (!sentViaWs) {
-                const data = await sendChatMessageRest(appointmentId, { text });
+                const data = await sendChatMessageRest(appointmentId, payload);
                 if (data.chat_access) {
                     applyConversationAccess(patientId, {
                         ...data.chat_access,
@@ -871,12 +915,17 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
             }
 
             if (onSendMessage) {
-                onSendMessage({ text, appointmentId, patientId });
+                onSendMessage({ text, appointmentId, patientId, hasAttachment: Boolean(attachments) });
             }
         } catch (error) {
             setInputMessage(text);
-            toast.error(apiErrorMessage(error, 'Failed to send message'));
+            if (draftImage?.file) {
+                const previewUrl = URL.createObjectURL(draftImage.file);
+                setPendingImage({ file: draftImage.file, previewUrl });
+            }
+            toast.error(apiErrorMessage(error, imageFile ? 'Failed to send image' : 'Failed to send message'));
         } finally {
+            setIsUploading(false);
             setIsSending(false);
         }
     };
@@ -888,9 +937,12 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
         }
     };
 
-    const handleFileUpload = async (e) => {
+    const handleFileSelect = (e) => {
         const file = e.target.files?.[0];
-        if (!file || !selectedPatient || !canSend || isUploading) return;
+        if (!file || !selectedPatient || !canSend || isUploading || isSending) {
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
 
         if (!file.type.startsWith('image/')) {
             toast.error('Only image attachments are supported.');
@@ -898,52 +950,23 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
             return;
         }
 
-        const { patientId } = selectedPatient;
-        const appointmentId = selectedPatientRef.current?.appointmentId
-            || chatAccess?.active_appointment_id;
-        if (!appointmentId) {
-            toast.error('No active consultation to send images.');
-            if (fileInputRef.current) fileInputRef.current.value = '';
-            return;
+        setPendingImage((prev) => {
+            if (prev?.previewUrl) {
+                URL.revokeObjectURL(prev.previewUrl);
+            }
+            return {
+                file,
+                previewUrl: URL.createObjectURL(file),
+            };
+        });
+
+        // Allow selecting the same file again later
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
         }
 
-        setIsUploading(true);
-
-        try {
-            const attachment = await uploadChatImage(file);
-            const sentViaWs = wsConnectionRef.current?.sendChatMessage({
-                text: '',
-                attachments: [attachment],
-            });
-
-            if (!sentViaWs) {
-                const data = await sendChatMessageRest(appointmentId, {
-                    text: '',
-                    attachments: [attachment],
-                });
-                if (data.chat_access) {
-                    applyConversationAccess(patientId, {
-                        ...data.chat_access,
-                        active_appointment_id: appointmentId,
-                    });
-                }
-                if (data.message) {
-                    const uiMessage = mapBackendMessageToUi(data.message, patientId);
-                    const existing = messagesByPatientRef.current.get(normalizePatientId(patientId)) || [];
-                    syncMessagesForPatient(
-                        patientId,
-                        mergeMessagesById(existing, [uiMessage])
-                    );
-                }
-            }
-        } catch (error) {
-            toast.error(apiErrorMessage(error, 'Failed to upload image'));
-        } finally {
-            setIsUploading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
+        // Focus caption input like WhatsApp
+        requestAnimationFrame(() => inputRef.current?.focus());
     };
 
     const handlePatientSelect = (patient) => {
@@ -1139,19 +1162,41 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
                                 Messaging is only available during a live consultation or active follow-up period.
                             </p>
                         )}
+                        {hasPendingImage && (
+                            <div className="mb-2 relative inline-block">
+                                <img
+                                    src={pendingImage.previewUrl}
+                                    alt="Selected attachment"
+                                    className="h-24 w-24 object-cover rounded-lg border border-gray-200"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={clearPendingImage}
+                                    disabled={isSending || isUploading}
+                                    className="absolute -top-2 -right-2 p-1 rounded-full bg-gray-800 text-white shadow hover:bg-gray-700 disabled:opacity-50"
+                                    aria-label="Remove selected image"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                                <p className="mt-1 text-xs text-gray-500 truncate max-w-[10rem]">
+                                    {pendingImage.file?.name}
+                                </p>
+                            </div>
+                        )}
                         <div className="flex items-end gap-2">
                             <div className="flex items-center gap-1">
                                 <button
+                                    type="button"
                                     className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 disabled:opacity-50"
                                     onClick={() => fileInputRef.current?.click()}
-                                    disabled={!canSend || isUploading}
+                                    disabled={!canSend || isUploading || isSending}
                                 >
                                     <Paperclip className="w-5 h-5" />
                                 </button>
                                 <input
                                     type="file"
                                     ref={fileInputRef}
-                                    onChange={handleFileUpload}
+                                    onChange={handleFileSelect}
                                     className="hidden"
                                     accept="image/*"
                                 />
@@ -1161,15 +1206,22 @@ const Messenger = ({ onSendMessage, onPatientSelect }) => {
                                 value={inputMessage}
                                 onChange={(e) => setInputMessage(e.target.value)}
                                 onKeyDown={handleKeyPress}
-                                placeholder={canSend ? 'Type a message...' : 'Chat is read-only'}
-                                disabled={!canSend || isSending}
+                                placeholder={
+                                    !canSend
+                                        ? 'Chat is read-only'
+                                        : hasPendingImage
+                                            ? 'Add a caption...'
+                                            : 'Type a message...'
+                                }
+                                disabled={!canSend || isSending || isUploading}
                                 className="flex-1 resize-none border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D614E]/50 focus:border-transparent max-h-32 min-h-[34px] disabled:bg-gray-50 disabled:text-gray-400"
                                 rows={1}
                             />
                             <button
+                                type="button"
                                 onClick={handleSendMessage}
-                                disabled={!inputMessage.trim() || !canSend || isSending}
-                                className={`p-2.5 rounded-lg transition-all ${inputMessage.trim() && canSend && !isSending
+                                disabled={!canSubmit}
+                                className={`p-2.5 rounded-lg transition-all ${canSubmit
                                     ? 'bg-[#0D614E] hover:bg-[#0A4D3E] text-white shadow-sm'
                                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                                     }`}

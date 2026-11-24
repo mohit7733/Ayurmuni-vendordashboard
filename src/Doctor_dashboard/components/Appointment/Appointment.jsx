@@ -575,7 +575,8 @@ const AppointmentsPage = () => {
                     day: apt.day,
                     call_status: apt.call_status,
                     cancelled_by: apt.cancelled_by,
-                    cancellation_reason: apt.cancellation_reason
+                    cancellation_reason: apt.cancellation_reason,
+                    missed_by: apt.missed_by,
                 }));
                 setAppointments(appointmentsData);
                 setTotalItems(response.data.data.count ?? appointmentsData.length);
@@ -1063,7 +1064,7 @@ const AppointmentsPage = () => {
                                                     <td className="px-6 py-4">
                                                         {appointment.status === "missed" ? (
                                                             <div className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">
-                                                                {appointment?.missed_by === "doctor" ? "Missed by Doctor" : "Missed by Patient"}
+                                                                {(appointment?.missed_by === "doctor" || appointment?.missed_by === "system") ? "Missed by Doctor" : "Missed by Patient"}
                                                             </div>
                                                         ) :
                                                             <StatusBadge status={appointment.status} />
