@@ -932,7 +932,7 @@ export default function InventoryVault() {
             Download Catalogue / Barcodes
           </Button>
           <Button variant="secondary" onClick={() => navigate("/vendor/bulk-upload-products")}>
-            Bulk Upload
+            Bulk Upload / Update
           </Button>
           <Button onClick={() => navigate("/vendor/new-product")}>+ Add Product</Button>
         </>
@@ -1054,7 +1054,7 @@ export default function InventoryVault() {
             ) : (
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <Button variant="secondary" onClick={() => navigate("/vendor/bulk-upload-products")}>
-                  Bulk Upload
+                  Bulk Upload / Update
                 </Button>
                 <Button onClick={() => navigate("/vendor/new-product")}>+ Add Product</Button>
               </div>

@@ -93,6 +93,23 @@ export const vendorService = {
         });
     },
 
+    bulkUpdateProducts: (file) => {
+        if (!file) {
+            return Promise.reject({
+                message: "Excel file is required",
+                status: 400,
+                data: null,
+            });
+        }
+        const formData = new FormData();
+        formData.append("file", file);
+        return API.post("/vendors/product/bulk-update/", formData, {
+            headers: {
+                "Content-Type": "multipart/form-data",
+            },
+        });
+    },
+
     getFieldInfo: (searchKey, extraParams = {}) =>
         API.get(`/vendors/fields/info/${buildQuery({ search: searchKey, ...extraParams })}`),
 

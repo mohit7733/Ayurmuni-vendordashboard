@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
     Upload,
@@ -22,10 +22,17 @@ import {
 import { vendorService } from "../../../services/vendorService";
 import DashboardPageShell from "../../components/shared/DashboardPageShell";
 import Button from "../../components/shared/Button";
+import {
+    exportBulkUpdateWorkbook,
+    extractApiErrorMessage,
+} from "../../utils/exportHelpers";
 import "../../components/shared/vendor-shared.css";
 
-const TEMPLATE_URL = "/templates/products_bulk_upload_template.xlsx";
-const TEMPLATE_FILENAME = "products_bulk_upload_template.xlsx";
+const UPLOAD_TEMPLATE_URL = "/templates/products_bulk_upload_template.xlsx";
+const UPLOAD_TEMPLATE_FILENAME = "products_bulk_upload_template.xlsx";
+const UPDATE_TEMPLATE_URL = "/templates/products_bulk_update_template.xlsx";
+const UPDATE_TEMPLATE_FILENAME = "products_bulk_update_template.xlsx";
+
 const ACCEPTED_TYPES = [
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-excel",
@@ -43,8 +50,8 @@ const SHEET_GUIDE = [
     {
         name: "Variants",
         columns:
-            "product_key, vendor_sku_code, title, is_default, physical_state, calculation_mode, cost_per_item, size, weightage, selling_price, mrp, discount, is_free_shipping, shipping_amount, is_returnable, returnable_days, pay_on_delivery, prescription_required, tax_name, tax_rate",
-        tip: "One row per SKU/size. Match product_key to Products. Set is_default=True for the main variant. physical_state values come from References (gel, oil, powder, liquid, solid, etc.).",
+            "product_key, vendor_sku_code, title, is_default, physical_state, calculation_mode, cost_per_item, size, weightage, selling_price, mrp, discount, is_free_shipping, shipping_amount, is_returnable, returnable_days, pay_on_delivery, prescription_required, expire_at, tax_name, tax_rate",
+        tip: "One row per SKU/size. Match product_key to Products. Set is_default=True for the main variant. expire_at is optional (YYYY-MM-DD). For updates, keep existing vendor_sku_code values so rows match current variants.",
     },
     {
         name: "Gallery",
@@ -58,6 +65,114 @@ const SHEET_GUIDE = [
         tip: "Lookup sheet only — do not invent IDs. Copy exact UUIDs into Products and Variants. Sample product rows in other sheets can be deleted before upload.",
     },
 ];
+
+const MODE_CONFIG = {
+    upload: {
+        label: "New Upload",
+        pageTitle: "Bulk Upload",
+        accent: "Products",
+        subtitle: "Upload multiple products, variants, and images from one Excel file.",
+        heading: (
+            <>
+                Bulk Upload <span className="text-[#0D614E]">Products</span>
+            </>
+        ),
+        description:
+            "Download the template, fill Products → Variants → Gallery, then upload the .xlsx file.",
+        dropTitle: "Upload Excel File",
+        dropHint: `Use the official new-product template (.xlsx). Max ${MAX_FILE_SIZE_MB} MB.`,
+        actionLabel: "Upload Products",
+        howTitle: "How it works",
+        howSubtitle: "Follow these steps for a successful upload.",
+        templateUrl: UPLOAD_TEMPLATE_URL,
+        templateFilename: UPLOAD_TEMPLATE_FILENAME,
+        templateButtonLabel: "Download Excel Template",
+        successEmpty: "Your products are ready to review in the catalog.",
+        successList: "These products were uploaded successfully.",
+        resultNoun: "Upload",
+        api: (file) => vendorService.bulkUploadProducts(file),
+        steps: [
+            <>
+                Download the template and keep sheet names:{" "}
+                <strong>Products</strong>, <strong>Variants</strong>,{" "}
+                <strong>Gallery</strong>, <strong>References</strong>.
+            </>,
+            <>
+                Fill product rows first, then add variants and gallery rows using the same{" "}
+                <strong>product_key</strong>.
+            </>,
+            <>
+                Copy subcategory, brand, and disease IDs from the{" "}
+                <strong>References</strong> sheet — do not invent UUIDs.
+            </>,
+            <>Save as .xlsx, upload here, and fix any row errors shown after upload.</>,
+        ],
+        tips: [
+            "Keep example rows or replace them — do not rename sheet headers.",
+            <>
+                Boolean fields use <code className="text-xs bg-gray-100 px-1 rounded">True</code> /{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">False</code>.
+            </>,
+            <>
+                Every variant needs a unique <strong>vendor_sku_code</strong>.
+            </>,
+            "Gallery media URLs must be publicly reachable HTTPS links.",
+            "Stock quantity is managed separately in Stock Management after approval.",
+        ],
+    },
+    update: {
+        label: "Update",
+        pageTitle: "Bulk Update",
+        accent: "Products",
+        subtitle: "Download your products, edit MRP, expiry, and other fields, then upload the update Excel.",
+        heading: (
+            <>
+                Bulk Update <span className="text-[#0D614E]">Products</span>
+            </>
+        ),
+        description:
+            "Download Product Excel in the update template format, edit MRP / expiry / etc., then upload the same file.",
+        dropTitle: "Upload Update Excel",
+        dropHint: `Upload the same multi-sheet Excel you downloaded (.xlsx). Max ${MAX_FILE_SIZE_MB} MB.`,
+        actionLabel: "Update Products",
+        howTitle: "How update works",
+        howSubtitle: "Download → edit → upload the same Excel format.",
+        templateUrl: UPDATE_TEMPLATE_URL,
+        templateFilename: UPDATE_TEMPLATE_FILENAME,
+        templateButtonLabel: "Download Blank Update Template",
+        successEmpty: "Your product updates are ready to review in the catalog.",
+        successList: "These products were updated successfully.",
+        resultNoun: "Update",
+        api: (file) => vendorService.bulkUpdateProducts(file),
+        steps: [
+            <>
+                Click <strong>Download Product Excel</strong> — it uses the same sheets as the update
+                template (<strong>Products</strong>, <strong>Variants</strong>, <strong>Gallery</strong>,{" "}
+                <strong>References</strong>).
+            </>,
+            <>
+                Edit fields you want to change (e.g. <strong>mrp</strong>, <strong>selling_price</strong>,{" "}
+                <strong>expire_at</strong>, descriptions). Keep <strong>vendor_sku_code</strong> and
+                headers unchanged.
+            </>,
+            <>
+                Save the same .xlsx file and upload it here — products will update via bulk-update.
+            </>,
+            <>Fix any row errors shown after update, then re-upload if needed.</>,
+        ],
+        tips: [
+            "Download Product Excel and re-upload that same file after edits.",
+            "Match existing variants by vendor_sku_code — do not invent new SKUs for updates.",
+            "expire_at accepts YYYY-MM-DD or ISO datetime; leave blank if unchanged/none.",
+            <>
+                Boolean fields use <code className="text-xs bg-gray-100 px-1 rounded">True</code> /{" "}
+                <code className="text-xs bg-gray-100 px-1 rounded">False</code>.
+            </>,
+            "Do not rename sheet names or header columns.",
+            "Stock quantity is still managed separately in Stock Management.",
+        ],
+    },
+};
 
 const formatBytes = (bytes) => {
     if (!bytes && bytes !== 0) return "—";
@@ -190,9 +305,11 @@ const normalizeUploadedProducts = (data) => {
           ? data.results
           : Array.isArray(data?.created_products)
             ? data.created_products
-            : Array.isArray(data?.products)
-              ? data.products
-              : [];
+            : Array.isArray(data?.updated_products)
+              ? data.updated_products
+              : Array.isArray(data?.products)
+                ? data.products
+                : [];
 
     return rows
         .map((item) => {
@@ -212,7 +329,9 @@ const normalizeUploadedProducts = (data) => {
                     "—",
                 variant_count: Array.isArray(variants) ? variants.length : item.variant_count ?? null,
                 is_active: product.is_active ?? true,
-                status: item.status || (product.is_active === false ? "Inactive" : "Created"),
+                status:
+                    item.status ||
+                    (product.is_active === false ? "Inactive" : "Updated"),
                 cover_url:
                     item.cover_url ||
                     product.cover_url ||
@@ -244,29 +363,138 @@ const extractSummary = (data, uploadedProducts = []) => {
             data.created_count ??
             data.success_count ??
             data.products_created ??
-            createdFromList,
-        updated: data.updated ?? data.updated_count ?? data.products_updated ?? null,
+            null,
+        updated:
+            data.updated ??
+            data.updated_count ??
+            data.products_updated ??
+            (createdFromList && data.created == null ? createdFromList : null),
         failed: data.failed ?? data.failed_count ?? data.error_count ?? null,
         total: data.total ?? data.total_count ?? createdFromList,
         skipped: data.skipped ?? data.skipped_count ?? null,
-        variants: data.variants_created ?? data.variant_count ?? data.variants ?? null,
+        variants:
+            data.variants_updated ??
+            data.variants_created ??
+            data.variant_count ??
+            data.variants ??
+            null,
     };
 };
 
 const getErrorPayload = (err) =>
     err?.response?.data || err?.data || err?.originalError?.response?.data || null;
 
+const resolveMode = (value) => (value === "update" ? "update" : "upload");
+
+async function fetchAllVendorProducts() {
+    const allResults = [];
+    let page = 1;
+    const pageSize = 100;
+    const maxPages = 50;
+
+    while (page <= maxPages) {
+        const response = await vendorService.getProducts({
+            page,
+            page_size: pageSize,
+        });
+        const payload = response?.data?.data || {};
+        const results = Array.isArray(payload.results) ? payload.results : [];
+        allResults.push(...results);
+        const total = Number(payload.count);
+        if (!results.length) break;
+        if (Number.isFinite(total) && allResults.length >= total) break;
+        if (!payload.next && results.length < pageSize) break;
+        page += 1;
+    }
+
+    return allResults;
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+
+    const workers = Array.from({ length: Math.min(limit, items.length) || 0 }, async () => {
+        while (nextIndex < items.length) {
+            const current = nextIndex;
+            nextIndex += 1;
+            results[current] = await mapper(items[current], current);
+        }
+    });
+
+    await Promise.all(workers);
+    return results;
+}
+
+async function fetchProductsForBulkUpdateExport() {
+    const listed = await fetchAllVendorProducts();
+    if (!listed.length) return [];
+
+    const detailed = await mapWithConcurrency(listed, 5, async (item) => {
+        const productId = item?.id;
+        if (!productId) return item;
+        try {
+            const response = await vendorService.getSingleProduct(productId);
+            const full = response?.data?.data;
+            return full && typeof full === "object" ? full : item;
+        } catch {
+            return item;
+        }
+    });
+
+    return detailed.filter(Boolean);
+}
+
+async function fetchBulkUpdateReferences() {
+    const [brandResponse, subcategoryResponse, diseaseResponse] = await Promise.all([
+        vendorService.getFieldInfo("brand-name").catch(() => null),
+        vendorService
+            .getFieldInfo("product-subcategory", { is_product_sale: true })
+            .catch(() => null),
+        vendorService.getFieldInfo("health-diseases").catch(() => null),
+    ]);
+
+    return {
+        brands: Array.isArray(brandResponse?.data?.data) ? brandResponse.data.data : [],
+        subcategories: Array.isArray(subcategoryResponse?.data?.data)
+            ? subcategoryResponse.data.data
+            : [],
+        diseases: Array.isArray(diseaseResponse?.data?.data) ? diseaseResponse.data.data : [],
+    };
+}
+
 export default function BulkUploadProducts() {
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const mode = resolveMode(searchParams.get("tab"));
+    const config = MODE_CONFIG[mode];
+
     const inputRef = useRef(null);
     const [file, setFile] = useState(null);
     const [dragging, setDragging] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [downloadingProducts, setDownloadingProducts] = useState(false);
     const [clientError, setClientError] = useState("");
     const [result, setResult] = useState(null);
     const [showGuide, setShowGuide] = useState(true);
 
     const resetResult = () => setResult(null);
+
+    const setMode = (nextMode) => {
+        const resolved = resolveMode(nextMode);
+        setSearchParams(resolved === "upload" ? {} : { tab: "update" }, { replace: true });
+        setFile(null);
+        setClientError("");
+        setDragging(false);
+        setResult(null);
+    };
+
+    useEffect(() => {
+        setFile(null);
+        setClientError("");
+        setDragging(false);
+        setResult(null);
+    }, [mode]);
 
     const validateFile = (selected) => {
         if (!selected) return "Please select an Excel file.";
@@ -335,8 +563,8 @@ export default function BulkUploadProducts() {
     const handleDownloadTemplate = () => {
         try {
             const link = document.createElement("a");
-            link.href = TEMPLATE_URL;
-            link.download = TEMPLATE_FILENAME;
+            link.href = config.templateUrl;
+            link.download = config.templateFilename;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -346,7 +574,57 @@ export default function BulkUploadProducts() {
         }
     };
 
-    const handleUpload = async () => {
+    const handleDownloadProductsExcel = async () => {
+        if (downloadingProducts) return;
+        try {
+            setDownloadingProducts(true);
+            toast.loading("Preparing product Excel in update format…", {
+                id: "bulk-update-export",
+            });
+
+            const [products, references] = await Promise.all([
+                fetchProductsForBulkUpdateExport(),
+                fetchBulkUpdateReferences(),
+            ]);
+
+            if (!products.length) {
+                toast.error("No products found to download", { id: "bulk-update-export" });
+                return;
+            }
+
+            const stamp = new Date().toISOString().slice(0, 10);
+            const exported = exportBulkUpdateWorkbook(
+                `products-bulk-update-${stamp}.xlsx`,
+                products,
+                references
+            );
+
+            if (!exported) {
+                toast.error("Could not build update Excel from products", {
+                    id: "bulk-update-export",
+                });
+                return;
+            }
+
+            const variantCount = products.reduce(
+                (sum, product) =>
+                    sum + (Array.isArray(product?.variants) ? product.variants.length : 0),
+                0
+            );
+            toast.success(
+                `Downloaded ${products.length} product${products.length > 1 ? "s" : ""} (${variantCount} variant${variantCount === 1 ? "" : "s"}) in update template format`,
+                { id: "bulk-update-export" }
+            );
+        } catch (err) {
+            toast.error(extractApiErrorMessage(err) || "Failed to download product Excel", {
+                id: "bulk-update-export",
+            });
+        } finally {
+            setDownloadingProducts(false);
+        }
+    };
+
+    const handleSubmit = async () => {
         if (!file) {
             const msg = "Please select an Excel file first.";
             setClientError(msg);
@@ -366,7 +644,7 @@ export default function BulkUploadProducts() {
         resetResult();
 
         try {
-            const response = await vendorService.bulkUploadProducts(file);
+            const response = await config.api(file);
             const payload = response?.data ?? response;
             const uploadedProducts = normalizeUploadedProducts(payload);
             const errors = normalizeErrors(payload);
@@ -379,6 +657,7 @@ export default function BulkUploadProducts() {
                 (payload?.success === true ||
                     uploadedProducts.length > 0 ||
                     (summary.created != null && Number(summary.created) > 0) ||
+                    (summary.updated != null && Number(summary.updated) > 0) ||
                     (errors.length === 0 && httpOk));
 
             setResult({
@@ -387,8 +666,10 @@ export default function BulkUploadProducts() {
                     payload?.message ||
                     payload?.detail ||
                     (success
-                        ? "Products uploaded successfully."
-                        : "Upload completed with issues. Review the errors below."),
+                        ? mode === "update"
+                            ? "Products updated successfully."
+                            : "Products uploaded successfully."
+                        : `${config.resultNoun} completed with issues. Review the errors below.`),
                 summary,
                 errors,
                 uploadedProducts,
@@ -396,11 +677,23 @@ export default function BulkUploadProducts() {
             });
 
             if (success && errors.length === 0) {
-                toast.success(payload?.message || "Bulk upload completed successfully");
+                toast.success(
+                    payload?.message ||
+                        (mode === "update"
+                            ? "Bulk update completed successfully"
+                            : "Bulk upload completed successfully")
+                );
             } else if (success && errors.length > 0) {
-                toast.success(payload?.message || "Upload finished with some row issues");
+                toast.success(
+                    payload?.message ||
+                        `${config.resultNoun} finished with some row issues`
+                );
             } else {
-                toast.error(payload?.message || payload?.detail || "Bulk upload failed");
+                toast.error(
+                    payload?.message ||
+                        payload?.detail ||
+                        (mode === "update" ? "Bulk update failed" : "Bulk upload failed")
+                );
             }
         } catch (err) {
             const data = getErrorPayload(err);
@@ -411,7 +704,9 @@ export default function BulkUploadProducts() {
                 err?.message ||
                 data?.message ||
                 data?.detail ||
-                "Failed to upload products. Please check your file and try again.";
+                (mode === "update"
+                    ? "Failed to update products. Please check your file and try again."
+                    : "Failed to upload products. Please check your file and try again.");
 
             setResult({
                 success: false,
@@ -419,7 +714,16 @@ export default function BulkUploadProducts() {
                 summary,
                 errors: errors.length
                     ? errors
-                    : [{ row: null, sheet: null, field: null, product_key: null, vendor_sku_code: null, message }],
+                    : [
+                          {
+                              row: null,
+                              sheet: null,
+                              field: null,
+                              product_key: null,
+                              vendor_sku_code: null,
+                              message,
+                          },
+                      ],
                 uploadedProducts,
                 raw: data,
             });
@@ -429,20 +733,39 @@ export default function BulkUploadProducts() {
         }
     };
 
+    const tabs = useMemo(
+        () => [
+            { key: "upload", label: MODE_CONFIG.upload.label },
+            { key: "update", label: MODE_CONFIG.update.label },
+        ],
+        []
+    );
+
     return (
         <DashboardPageShell
-            title="Bulk Upload"
-            accent="Products"
-            subtitle="Upload multiple products, variants, and images from one Excel file."
+            title={config.pageTitle}
+            accent={config.accent}
+            subtitle={config.subtitle}
             breadcrumbs={[
                 { label: "Dashboard", href: "/vendor/dashboard" },
                 { label: "Products", href: "/vendor/products" },
-                { label: "Bulk Upload" },
+                { label: "Bulk Upload / Update" },
             ]}
             actions={
                 <>
+                    {mode === "update" && (
+                        <Button
+                            variant="secondary"
+                            onClick={handleDownloadProductsExcel}
+                            loading={downloadingProducts}
+                            disabled={uploading}
+                        >
+                            {!downloadingProducts && <Download size={15} />} Download Product Excel
+                        </Button>
+                    )}
                     <Button variant="secondary" onClick={handleDownloadTemplate}>
-                        <Download size={15} /> Download Template
+                        <Download size={15} />{" "}
+                        {mode === "update" ? "Download Update Template" : "Download Template"}
                     </Button>
                     <Button onClick={() => navigate("/vendor/new-product")}>
                         + Add Single Product
@@ -459,13 +782,35 @@ export default function BulkUploadProducts() {
                         >
                             <ArrowLeft size={14} /> Back to Products
                         </Link>
-                        <h1 className="text-2xl font-bold text-gray-900">
-                            Bulk Upload <span className="text-[#0D614E]">Products</span>
-                        </h1>
-                        <p className="text-gray-500 text-sm mt-1">
-                            Download the template, fill Products → Variants → Gallery, then upload the .xlsx file.
-                        </p>
+                        <h1 className="text-2xl font-bold text-gray-900">{config.heading}</h1>
+                        <p className="text-gray-500 text-sm mt-1">{config.description}</p>
                     </div>
+                </div>
+
+                <div
+                    className="mb-5 inline-flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm"
+                    role="tablist"
+                    aria-label="Bulk upload or update"
+                >
+                    {tabs.map((tab) => {
+                        const active = mode === tab.key;
+                        return (
+                            <button
+                                key={tab.key}
+                                type="button"
+                                role="tab"
+                                aria-selected={active}
+                                onClick={() => setMode(tab.key)}
+                                className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                                    active
+                                        ? "bg-[#0D614E] text-white"
+                                        : "text-gray-600 hover:bg-gray-50"
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
@@ -476,10 +821,10 @@ export default function BulkUploadProducts() {
                                     <FileSpreadsheet size={20} className="text-[#0D614E]" />
                                 </div>
                                 <div>
-                                    <h2 className="text-base font-semibold text-gray-900">Upload Excel File</h2>
-                                    <p className="text-sm text-gray-500 mt-0.5">
-                                        Use the official template (.xlsx). Max {MAX_FILE_SIZE_MB} MB.
-                                    </p>
+                                    <h2 className="text-base font-semibold text-gray-900">
+                                        {config.dropTitle}
+                                    </h2>
+                                    <p className="text-sm text-gray-500 mt-0.5">{config.dropHint}</p>
                                 </div>
                             </div>
 
@@ -519,7 +864,9 @@ export default function BulkUploadProducts() {
                                 <p className="text-sm font-medium text-gray-800">
                                     Drag & drop your Excel file here
                                 </p>
-                                <p className="text-xs text-gray-400 mt-1">or click to browse from your computer</p>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    or click to browse from your computer
+                                </p>
                                 <p className="text-[11px] text-gray-400 mt-3">Accepted: .xlsx, .xls</p>
                             </div>
 
@@ -537,8 +884,12 @@ export default function BulkUploadProducts() {
                                             <FileSpreadsheet size={18} className="text-[#0D614E]" />
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                                            <p className="text-xs text-gray-400">{formatBytes(file.size)}</p>
+                                            <p className="text-sm font-medium text-gray-900 truncate">
+                                                {file.name}
+                                            </p>
+                                            <p className="text-xs text-gray-400">
+                                                {formatBytes(file.size)}
+                                            </p>
                                         </div>
                                     </div>
                                     <button
@@ -557,11 +908,19 @@ export default function BulkUploadProducts() {
                             )}
 
                             <div className="mt-5 flex flex-wrap items-center gap-2">
-                                <Button onClick={handleUpload} disabled={!file || uploading} loading={uploading}>
-                                    <Upload size={15} /> Upload Products
+                                <Button
+                                    onClick={handleSubmit}
+                                    disabled={!file || uploading}
+                                    loading={uploading}
+                                >
+                                    <Upload size={15} /> {config.actionLabel}
                                 </Button>
                                 {(file || result) && (
-                                    <Button variant="secondary" onClick={clearFile} disabled={uploading}>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={clearFile}
+                                        disabled={uploading}
+                                    >
                                         <RefreshCw size={14} /> Reset
                                     </Button>
                                 )}
@@ -580,27 +939,37 @@ export default function BulkUploadProducts() {
                                     }`}
                                 >
                                     {result.success ? (
-                                        <CheckCircle2 size={22} className="text-green-600 shrink-0 mt-0.5" />
+                                        <CheckCircle2
+                                            size={22}
+                                            className="text-green-600 shrink-0 mt-0.5"
+                                        />
                                     ) : (
-                                        <AlertTriangle size={22} className="text-red-500 shrink-0 mt-0.5" />
+                                        <AlertTriangle
+                                            size={22}
+                                            className="text-red-500 shrink-0 mt-0.5"
+                                        />
                                     )}
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-start justify-between gap-2">
                                             <div>
                                                 <h3
                                                     className={`text-base font-semibold ${
-                                                        result.success ? "text-green-800" : "text-red-700"
+                                                        result.success
+                                                            ? "text-green-800"
+                                                            : "text-red-700"
                                                     }`}
                                                 >
                                                     {result.success
                                                         ? result.errors?.length
-                                                            ? "Upload completed with warnings"
-                                                            : "Upload completed"
-                                                        : "Upload failed"}
+                                                            ? `${config.resultNoun} completed with warnings`
+                                                            : `${config.resultNoun} completed`
+                                                        : `${config.resultNoun} failed`}
                                                 </h3>
                                                 <p
                                                     className={`text-sm mt-0.5 ${
-                                                        result.success ? "text-green-700" : "text-red-600"
+                                                        result.success
+                                                            ? "text-green-700"
+                                                            : "text-red-600"
                                                     }`}
                                                 >
                                                     {result.message}
@@ -634,24 +1003,34 @@ export default function BulkUploadProducts() {
                                                         }
                                                     />
                                                 )}
-                                                {(result.summary.created != null ||
-                                                    result.uploadedProducts?.length > 0) && (
+                                                {result.summary.created != null && (
                                                     <StatChip
                                                         label="Created"
-                                                        value={
-                                                            result.summary.created ??
-                                                            result.uploadedProducts.length
-                                                        }
+                                                        value={result.summary.created}
                                                         tone="green"
                                                     />
                                                 )}
-                                                {result.summary.updated != null && (
+                                                {(result.summary.updated != null ||
+                                                    (mode === "update" &&
+                                                        result.uploadedProducts?.length > 0)) && (
                                                     <StatChip
                                                         label="Updated"
-                                                        value={result.summary.updated}
+                                                        value={
+                                                            result.summary.updated ??
+                                                            result.uploadedProducts.length
+                                                        }
                                                         tone="blue"
                                                     />
                                                 )}
+                                                {mode === "upload" &&
+                                                    result.summary.created == null &&
+                                                    result.uploadedProducts?.length > 0 && (
+                                                        <StatChip
+                                                            label="Created"
+                                                            value={result.uploadedProducts.length}
+                                                            tone="green"
+                                                        />
+                                                    )}
                                                 {result.summary.variants != null && (
                                                     <StatChip
                                                         label="Variants"
@@ -682,7 +1061,8 @@ export default function BulkUploadProducts() {
                                     <div className="p-5 border-t border-gray-100">
                                         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                                             <h4 className="text-sm font-semibold text-gray-800">
-                                                Uploaded products ({result.uploadedProducts.length})
+                                                {mode === "update" ? "Updated" : "Uploaded"} products (
+                                                {result.uploadedProducts.length})
                                             </h4>
                                             <Link
                                                 to="/vendor/products"
@@ -756,7 +1136,11 @@ export default function BulkUploadProducts() {
                                                             </td>
                                                             <td className="px-3 py-3">
                                                                 <Badge
-                                                                    tone={product.is_active ? "green" : "gray"}
+                                                                    tone={
+                                                                        product.is_active
+                                                                            ? "green"
+                                                                            : "gray"
+                                                                    }
                                                                 >
                                                                     <CheckCircle2 size={11} />
                                                                     {product.status}
@@ -789,7 +1173,7 @@ export default function BulkUploadProducts() {
                                                 Issues ({result.errors.length})
                                             </h4>
                                             <p className="text-xs text-gray-400">
-                                                Fix these rows in Excel and upload again
+                                                Fix these rows in Excel and try again
                                             </p>
                                         </div>
                                         <div className="overflow-x-auto border border-gray-100 rounded-lg max-h-80">
@@ -840,8 +1224,8 @@ export default function BulkUploadProducts() {
                                     <div className="px-5 py-4 border-t border-green-100 flex flex-wrap items-center justify-between gap-2">
                                         <p className="text-sm text-gray-500">
                                             {result.uploadedProducts?.length
-                                                ? "These products were uploaded successfully."
-                                                : "Your products are ready to review in the catalog."}
+                                                ? config.successList
+                                                : config.successEmpty}
                                         </p>
                                         <Link
                                             to="/vendor/products"
@@ -862,58 +1246,46 @@ export default function BulkUploadProducts() {
                                     <Info size={20} className="text-amber-600" />
                                 </div>
                                 <div>
-                                    <h2 className="text-base font-semibold text-gray-900">How it works</h2>
+                                    <h2 className="text-base font-semibold text-gray-900">
+                                        {config.howTitle}
+                                    </h2>
                                     <p className="text-sm text-gray-500 mt-0.5">
-                                        Follow these steps for a successful upload.
+                                        {config.howSubtitle}
                                     </p>
                                 </div>
                             </div>
                             <ol className="space-y-3 text-sm text-gray-600">
-                                <li className="flex gap-3">
-                                    <span className="w-6 h-6 rounded-full bg-[#0D614E] text-white text-xs font-semibold flex items-center justify-center shrink-0">
-                                        1
-                                    </span>
-                                    <span>
-                                        Download the template and keep sheet names:{" "}
-                                        <strong>Products</strong>, <strong>Variants</strong>,{" "}
-                                        <strong>Gallery</strong>, <strong>References</strong>.
-                                    </span>
-                                </li>
-                                <li className="flex gap-3">
-                                    <span className="w-6 h-6 rounded-full bg-[#0D614E] text-white text-xs font-semibold flex items-center justify-center shrink-0">
-                                        2
-                                    </span>
-                                    <span>
-                                        Fill product rows first, then add variants and gallery rows using the same{" "}
-                                        <strong>product_key</strong>.
-                                    </span>
-                                </li>
-                                <li className="flex gap-3">
-                                    <span className="w-6 h-6 rounded-full bg-[#0D614E] text-white text-xs font-semibold flex items-center justify-center shrink-0">
-                                        3
-                                    </span>
-                                    <span>
-                                        Copy subcategory, brand, and disease IDs from the{" "}
-                                        <strong>References</strong> sheet — do not invent UUIDs.
-                                    </span>
-                                </li>
-                                <li className="flex gap-3">
-                                    <span className="w-6 h-6 rounded-full bg-[#0D614E] text-white text-xs font-semibold flex items-center justify-center shrink-0">
-                                        4
-                                    </span>
-                                    <span>
-                                        Save as .xlsx, upload here, and fix any row errors shown after upload.
-                                    </span>
-                                </li>
+                                {config.steps.map((step, index) => (
+                                    <li key={index} className="flex gap-3">
+                                        <span className="w-6 h-6 rounded-full bg-[#0D614E] text-white text-xs font-semibold flex items-center justify-center shrink-0">
+                                            {index + 1}
+                                        </span>
+                                        <span>{step}</span>
+                                    </li>
+                                ))}
                             </ol>
 
-                            <button
-                                type="button"
-                                onClick={handleDownloadTemplate}
-                                className="mt-5 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[#0D614E] border border-[#0D614E]/25 rounded-lg hover:bg-[#0D614E]/5 transition-colors"
-                            >
-                                <Download size={15} /> Download Excel Template
-                            </button>
+                            <div className="mt-5 space-y-2">
+                                {mode === "update" && (
+                                    <Button
+                                        variant="secondary"
+                                        className="w-full"
+                                        onClick={handleDownloadProductsExcel}
+                                        loading={downloadingProducts}
+                                        disabled={uploading}
+                                    >
+                                        {!downloadingProducts && <Download size={15} />} Download
+                                        Product Excel
+                                    </Button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={handleDownloadTemplate}
+                                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-[#0D614E] border border-[#0D614E]/25 rounded-lg hover:bg-[#0D614E]/5 transition-colors"
+                                >
+                                    <Download size={15} /> {config.templateButtonLabel}
+                                </button>
+                            </div>
                         </div>
 
                         <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
@@ -923,7 +1295,9 @@ export default function BulkUploadProducts() {
                                 className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50/80"
                             >
                                 <div>
-                                    <h2 className="text-base font-semibold text-gray-900">Sheet format guide</h2>
+                                    <h2 className="text-base font-semibold text-gray-900">
+                                        Sheet format guide
+                                    </h2>
                                     <p className="text-sm text-gray-500 mt-0.5">
                                         Required columns for each sheet
                                     </p>
@@ -941,7 +1315,9 @@ export default function BulkUploadProducts() {
                                             key={sheet.name}
                                             className="rounded-lg border border-gray-100 bg-gray-50/70 p-3.5"
                                         >
-                                            <p className="text-sm font-semibold text-gray-900">{sheet.name}</p>
+                                            <p className="text-sm font-semibold text-gray-900">
+                                                {sheet.name}
+                                            </p>
                                             <p className="text-[11px] text-gray-500 mt-1 font-mono leading-relaxed break-all">
                                                 {sheet.columns}
                                             </p>
@@ -958,19 +1334,18 @@ export default function BulkUploadProducts() {
                                     <ImageIcon size={18} className="text-blue-600" />
                                 </div>
                                 <div>
-                                    <h2 className="text-base font-semibold text-gray-900">Quick tips</h2>
-                                    <p className="text-sm text-gray-500 mt-0.5">Avoid common upload failures</p>
+                                    <h2 className="text-base font-semibold text-gray-900">
+                                        Quick tips
+                                    </h2>
+                                    <p className="text-sm text-gray-500 mt-0.5">
+                                        Avoid common {mode === "update" ? "update" : "upload"} failures
+                                    </p>
                                 </div>
                             </div>
                             <ul className="space-y-2 text-sm text-gray-600 list-disc pl-5">
-                                <li>Keep example rows or replace them — do not rename sheet headers.</li>
-                                <li>
-                                    Boolean fields use <code className="text-xs bg-gray-100 px-1 rounded">True</code> /{" "}
-                                    <code className="text-xs bg-gray-100 px-1 rounded">False</code>.
-                                </li>
-                                <li>Every variant needs a unique <strong>vendor_sku_code</strong>.</li>
-                                <li>Gallery media URLs must be publicly reachable HTTPS links.</li>
-                                <li>Stock quantity is managed separately in Stock Management after approval.</li>
+                                {config.tips.map((tip, index) => (
+                                    <li key={index}>{tip}</li>
+                                ))}
                             </ul>
                         </div>
                     </div>
